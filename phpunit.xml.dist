@@ -24,10 +24,20 @@
         >
 
     <testsuites>
-        <testsuite name="ZohoCRM ORM test suite">
+        <testsuite name="ZohoCRM Copy DB test suite">
             <directory>./tests/</directory>
         </testsuite>
     </testsuites>
+    <filter>
+        <whitelist processUncoveredFilesFromWhitelist="true">
+            <directory suffix=".php">src</directory>
+        </whitelist>
+    </filter>
+    <logging>
+        <log type="coverage-html" target="build/coverage" charset="UTF-8" yui="true" highlight="true"/>
+        <log type="coverage-clover" target="build/logs/clover.xml"/>
+    </logging>
+
 
     <php>
         <!-- PLEASE CONFIGURE AUTH TOKEN BELOW IN COPIED FILE -->
