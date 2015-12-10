@@ -1,0 +1,33 @@
+{
+	"name" : "wabel/zoho-crm-copy-db",
+	"description" : "This package contains code to help you copy ZohoCRM records directly into your database.",
+	"type" : "library",
+	"keywords" : [
+	  	"Zoho CRM",
+		"ZohoCRM",
+		"Zoho",
+		"ORM",
+		"Copy"
+	],
+	"require" : {
+		"php" : ">=5.4",
+		"wabel/zoho-crm-orm": "~1.0",
+		"doctrine/dbal": "~2.5"
+	},
+    "require-dev" : {
+	  "phpunit/phpunit": "~4.0",
+	  "satooshi/php-coveralls": "dev-master"
+	},
+	"autoload" : {
+		"psr-4" : {
+			"Wabel\\Zoho\\CRM\\Copy\\" : "src"
+		}
+	},
+    "autoload-dev" : {
+  	    "psr-4" : {
+		    "Wabel\\Zoho\\CRM\\Copy\\" : "tests"
+	    }
+    },
+  	"minimum-stability": "dev",
+    "prefer-stable": true
+}
