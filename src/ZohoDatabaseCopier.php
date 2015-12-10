@@ -33,6 +33,7 @@ class ZohoDatabaseCopier
     public function copy(AbstractZohoDao $dao)
     {
         $this->synchronizeDbModel($dao);
+        $this->copyData($dao);
     }
 
 
@@ -50,16 +51,17 @@ class ZohoDatabaseCopier
 
         $flatFields = $this->getFlatFields($dao->getFields());
 
+        $table->addColumn("id", "string", ['length'=>100]);
+        $table->setPrimaryKey(['id']);
+
         foreach ($flatFields as $field) {
             $columnName = $field['name'];
 
             $length = null;
             $index = false;
-            $pk = false;
 
             switch ($field['type']) {
                 case 'Lookup ID':
-                    $pk = true;
                 case 'Lookup':
                     $type = "string";
                     $length = 100;
@@ -102,11 +104,12 @@ class ZohoDatabaseCopier
                 $options['length'] = $length;
             }
 
+            //$options['notnull'] = $field['req'];
+            $options['notnull'] = false;
+
             $table->addColumn($columnName, $type, $options);
 
-            if ($pk) {
-                $table->setPrimaryKey([ $columnName ]);
-            } elseif ($index) {
+            if ($index) {
                 $table->addIndex([ $columnName ]);
             }
         }
@@ -141,7 +144,33 @@ class ZohoDatabaseCopier
 
     private function copyData(AbstractZohoDao $dao) {
         $records = $dao->getRecords();
+        $tableName = $this->prefix.$dao->getModule();
 
+        $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
+
+
+        $flatFields = $this->getFlatFields($dao->getFields());
+        $fieldsByName = [];
+        foreach ($flatFields as $field) {
+            $fieldsByName[$field['name']] = $field;
+        }
+
+        foreach ($records as $record) {
+            $data = [];
+            $types = [];
+            foreach ($table->getColumns() as $column) {
+                if ($column->getName() === 'id') {
+                    $data['id'] = $record->getZohoId();
+                    $types['id'] = 'string';
+                } else {
+                    $field = $fieldsByName[$column->getName()];
+                    $getterName = $field['getter'];
+                    $data[$column->getName()] = $record->$getterName();
+                    $types[$column->getName()] = $column->getType()->getName();
+                }
+            }
+            $this->connection->insert($tableName, $data, $types);
+        }
     }
 
     private function getFlatFields(array $fields)

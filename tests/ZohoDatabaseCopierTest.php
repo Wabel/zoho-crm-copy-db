@@ -52,8 +52,6 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
         return new EntitiesGeneratorService($this->getZohoClient(), new NullLogger());
     }
 
-    protected $firstName;
-
     public function testSync()
     {
         $generator = $this->getEntitiesGeneratorService();
