@@ -18,3 +18,38 @@ so if you do not know this library, [STOP READING NOW and follow this link](http
 How does it work?
 -----------------
 
+This projects provides a `ZohoDatabaseCopier` class, with a simple `copy` method. This method takes a `ZohoDao` in argument.
+`ZohoDaos` can be created using the [ZohoCRM ORM](https://github.com/Wabel/zoho-crm-orm).
+
+Usage:
+
+```php
+// $connection is a Doctrine DBAL connection to your database.
+$databaseCopier = new ZohoDatabaseCopier($connection);
+
+// $contactZohoDao is the Zoho Dao to the module you want to copy.
+$databaseCopier->copy($contactZohoDao);
+```
+
+The copy command will create a 'zoho_Contacts' table in your database and copy all data from Zoho.
+Table names are prefixed by 'zoho_'.
+
+You can change the prefix using the second (optional) argument of the constructor:
+
+```php
+// Generated database table will be prefixed with "my_prefix_"
+$databaseCopier = new ZohoDatabaseCopier($connection, "my_prefix_");
+```
+
+Symfony command
+---------------
+
+The project also comes with a Symfony Command that you can use to easily copy tables.
+
+The command's constructor takes in parameter a `ZohoDatabaseCopier` instance and a list of `ZohoDAOs`.
+
+Usage:
+
+```sh
+$ console zoho:copy-db
+```
