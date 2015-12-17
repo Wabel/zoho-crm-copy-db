@@ -155,13 +155,14 @@ class ZohoDatabaseCopier
             $fieldsByName[$field['name']] = $field;
         }
 
+        $select = $this->connection->prepare('SELECT * FROM '.$tableName.' WHERE id = :id');
+
         foreach ($records as $record) {
             $data = [];
             $types = [];
             foreach ($table->getColumns() as $column) {
                 if ($column->getName() === 'id') {
-                    $data['id'] = $record->getZohoId();
-                    $types['id'] = 'string';
+                    continue;
                 } else {
                     $field = $fieldsByName[$column->getName()];
                     $getterName = $field['getter'];
@@ -169,7 +170,20 @@ class ZohoDatabaseCopier
                     $types[$column->getName()] = $column->getType()->getName();
                 }
             }
-            $this->connection->insert($tableName, $data, $types);
+
+            $select->execute([ 'id' => $record->getZohoId() ]);
+            $result = $select->fetch(\PDO::FETCH_ASSOC);
+            if ($result === false) {
+                $data['id'] = $record->getZohoId();
+                $types['id'] = 'string';
+
+                $this->connection->insert($tableName, $data, $types);
+            } else {
+                $identifier = ['id' => $record->getZohoId() ];
+                $types['id'] = 'string';
+
+                $this->connection->update($tableName, $data, $identifier, $types);
+            }
         }
     }
 

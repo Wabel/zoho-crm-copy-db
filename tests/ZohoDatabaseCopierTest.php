@@ -4,6 +4,7 @@ namespace Wabel\Zoho\CRM\Sync;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Psr\Log\NullLogger;
+use TestNamespace\Contact;
 use TestNamespace\ContactZohoDao;
 use Wabel\Zoho\CRM\Copy\ZohoDatabaseCopier;
 use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
@@ -62,11 +63,32 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
 
         $contactZohoDao = new ContactZohoDao($this->getZohoClient());
 
+        // Let's add a single user:
+        $testContact = new Contact();
+        $testContact->setLastName(uniqid('Test'));
+        $testContact->setFirstName('TestZohoCopier');
+        $testContact->setEmail($testContact->getLastName().'@test.com');
+        $contactZohoDao->save($testContact);
+
         $databaseCopier = new ZohoDatabaseCopier($this->dbConnection);
 
         $databaseCopier->copy($contactZohoDao);
 
         $this->assertTrue($this->dbConnection->getSchemaManager()->tablesExist('zoho_Contacts'));
+        $result = $this->dbConnection->fetchAssoc("SELECT * FROM zoho_Contacts WHERE id = :id", ["id"=>$testContact->getZohoId()]);
+        $this->assertNotFalse($result);
+        $this->assertEquals($testContact->getLastName(), $result['lastName']);
+
+        // Now, let's trigger an update:
+        $testContact->setLastName(uniqid('Test2'));
+        $contactZohoDao->save($testContact);
+
+        $databaseCopier->copy($contactZohoDao);
+        $result = $this->dbConnection->fetchAssoc("SELECT * FROM zoho_Contacts WHERE id = :id", ["id"=>$testContact->getZohoId()]);
+        $this->assertNotFalse($result);
+        $this->assertEquals($testContact->getLastName(), $result['lastName']);
+
+        $contactZohoDao->delete($testContact->getZohoId());
     }
 
     protected function tearDown()
