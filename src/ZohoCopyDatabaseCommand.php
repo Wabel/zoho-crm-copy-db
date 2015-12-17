@@ -29,6 +29,7 @@ class ZohoCopyDatabaseCommand extends Command
      */
     public function __construct(ZohoDatabaseCopier $zohoDatabaseCopier, array $zohoDaos)
     {
+        parent::__construct();
         $this->zohoDatabaseCopier = $zohoDatabaseCopier;
         $this->zohoDaos = $zohoDaos;
     }

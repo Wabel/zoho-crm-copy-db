@@ -87,12 +87,23 @@ class ZohoDatabaseCopier
                 case 'TextArea':
                     $type = "text";
                     break;
+                case 'BigInt':
+                    $type = "bigint";
+                    break;
                 case 'Phone':
                 case 'Text':
                 case 'Email':
+                case 'Website':
                 case 'Pick List':
+                case 'Multiselect Pick List':
                     $type = "string";
                     $length = $field['maxlength'];
+                    break;
+                case 'Double':
+                    $type = "float";
+                    break;
+                case 'Integer':
+                    $type = "integer";
                     break;
                 default:
                     throw new \RuntimeException('Unknown type "'.$field['type'].'"');
