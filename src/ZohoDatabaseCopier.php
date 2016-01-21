@@ -73,6 +73,11 @@ class ZohoDatabaseCopier
                     $index = true;
                     $length = 25;
                     break;
+                case 'Formula':
+                    // Note: a Formula can return any type, but we have no way to know which type it returns...
+                    $type = "string";
+                    $length = 100;
+                    break;
                 case 'DateTime':
                     $type = "datetime";
                     break;
