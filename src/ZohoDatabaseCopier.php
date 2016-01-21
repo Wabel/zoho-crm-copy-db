@@ -60,6 +60,7 @@ class ZohoDatabaseCopier
             $length = null;
             $index = false;
 
+            // Note: full list of types available here: https://www.zoho.com/crm/help/customization/custom-fields.html
             switch ($field['type']) {
                 case 'Lookup ID':
                 case 'Lookup':
@@ -91,7 +92,9 @@ class ZohoDatabaseCopier
                     $type = "bigint";
                     break;
                 case 'Phone':
+                case 'Auto Number':
                 case 'Text':
+                case 'URL':
                 case 'Email':
                 case 'Website':
                 case 'Pick List':
@@ -100,10 +103,15 @@ class ZohoDatabaseCopier
                     $length = $field['maxlength'];
                     break;
                 case 'Double':
+                case 'Percent':
                     $type = "float";
                     break;
                 case 'Integer':
                     $type = "integer";
+                    break;
+                case 'Currency':
+                case 'Decimal':
+                    $type = "decimal";
                     break;
                 default:
                     throw new \RuntimeException('Unknown type "'.$field['type'].'"');
