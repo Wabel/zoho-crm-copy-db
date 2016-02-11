@@ -44,7 +44,7 @@ class ZohoDatabaseCopier
      * @throws \Doctrine\DBAL\Schema\SchemaException
      */
     private function synchronizeDbModel(AbstractZohoDao $dao) {
-        $tableName = $this->prefix.$dao->getModule();
+        $tableName = $this->prefix.$dao->getPluralName();
 
         $schema = new Schema();
         $table = $schema->createTable($tableName);
@@ -168,7 +168,7 @@ class ZohoDatabaseCopier
 
     private function copyData(AbstractZohoDao $dao) {
         $records = $dao->getRecords();
-        $tableName = $this->prefix.$dao->getModule();
+        $tableName = $this->prefix.$dao->getPluralName();
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
 
