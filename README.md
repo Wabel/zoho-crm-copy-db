@@ -41,6 +41,15 @@ You can change the prefix using the second (optional) argument of the constructo
 $databaseCopier = new ZohoDatabaseCopier($connection, "my_prefix_");
 ```
 
+By default, copy is performed incrementally. If you have touched some of the data in your database and want to copy again 
+everything, you can use the second parameter of the `copy` method:
+ 
+```php
+// Pass false as second parameter to force copying everything rather than doing an incremental copy.
+$databaseCopier->copy($contactZohoDao, false);
+```
+
+
 Symfony command
 ---------------
 

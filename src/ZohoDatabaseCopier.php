@@ -4,6 +4,7 @@ namespace Wabel\Zoho\CRM\Copy;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\SchemaDiff;
+use Doctrine\DBAL\Types\DateTimeType;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 
 /**
@@ -29,11 +30,14 @@ class ZohoDatabaseCopier
         $this->prefix = $prefix;
     }
 
-
-    public function copy(AbstractZohoDao $dao)
+    /**
+     * @param AbstractZohoDao $dao
+     * @param bool $incrementalSync Whether we synchronize only the modified files or everything.
+     */
+    public function copy(AbstractZohoDao $dao, $incrementalSync = true)
     {
         $this->synchronizeDbModel($dao);
-        $this->copyData($dao);
+        $this->copyData($dao, $incrementalSync);
     }
 
 
@@ -166,9 +170,27 @@ class ZohoDatabaseCopier
 
     }
 
-    private function copyData(AbstractZohoDao $dao) {
-        $records = $dao->getRecords();
+    /**
+     * @param AbstractZohoDao $dao
+     * @param bool $incrementalSync Whether we synchronize only the modified files or everything.
+     * @throws \Doctrine\DBAL\DBALException
+     * @throws \Doctrine\DBAL\Schema\SchemaException
+     * @throws \Wabel\Zoho\CRM\Exception\ZohoCRMResponseException
+     */
+    private function copyData(AbstractZohoDao $dao, $incrementalSync = true) {
         $tableName = $this->prefix.$dao->getPluralModuleName();
+
+        if ($incrementalSync) {
+            // Let's get the last modification date:
+            $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(lastActivityTime) FROM '.$tableName);
+            if ($lastActivityTime !== null) {
+                $lastActivityTime = new \DateTime($lastActivityTime);
+            }
+            $records = $dao->getRecords(null, null, $lastActivityTime);
+        } else {
+            $records = $dao->getRecords();
+        }
+
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
 
@@ -180,6 +202,8 @@ class ZohoDatabaseCopier
         }
 
         $select = $this->connection->prepare('SELECT * FROM '.$tableName.' WHERE id = :id');
+
+        $this->connection->beginTransaction();
 
         foreach ($records as $record) {
             $data = [];
@@ -209,6 +233,8 @@ class ZohoDatabaseCopier
                 $this->connection->update($tableName, $data, $identifier, $types);
             }
         }
+
+        $this->connection->commit();
     }
 
     private function getFlatFields(array $fields)
