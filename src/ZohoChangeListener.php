@@ -1,6 +1,8 @@
 <?php
 namespace Wabel\Zoho\CRM\Copy;
 
+use Wabel\Zoho\CRM\AbstractZohoDao;
+
 /**
  * Interface used to catch changes in Zoho.
  */
