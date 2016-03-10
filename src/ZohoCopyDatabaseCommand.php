@@ -64,7 +64,7 @@ class ZohoCopyDatabaseCommand extends Command
                 $this->lock->releaseLock();
             }
         } catch (LockException $e) {
-            $output->writeln('Could not start zoho:copy-db command. Another zoho:copy-db command is already running.');
+            $output->writeln('<error>Could not start zoho:copy-db command. Another zoho:copy-db command is already running.</error>');
         }
     }
 }
