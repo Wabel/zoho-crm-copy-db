@@ -1,4 +1,5 @@
 <?php
+
 namespace Wabel\Zoho\CRM\Copy;
 
 use Doctrine\DBAL\Connection;
@@ -12,7 +13,6 @@ use function Stringy\create as s;
  */
 class ZohoDatabaseCopier
 {
-
     /**
      * @var Connection
      */
@@ -27,9 +27,10 @@ class ZohoDatabaseCopier
 
     /**
      * ZohoDatabaseCopier constructor.
+     *
      * @param Connection $connection
      */
-    public function __construct(Connection $connection, $prefix = "zoho_", array $listeners = [])
+    public function __construct(Connection $connection, $prefix = 'zoho_', array $listeners = [])
     {
         $this->connection = $connection;
         $this->prefix = $prefix;
@@ -38,7 +39,7 @@ class ZohoDatabaseCopier
 
     /**
      * @param AbstractZohoDao $dao
-     * @param bool $incrementalSync Whether we synchronize only the modified files or everything.
+     * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
      */
     public function copy(AbstractZohoDao $dao, $incrementalSync = true)
     {
@@ -46,14 +47,16 @@ class ZohoDatabaseCopier
         $this->copyData($dao, $incrementalSync);
     }
 
-
     /**
      * Synchronizes the DB model with Zoho.
+     *
      * @param AbstractZohoDao $dao
+     *
      * @throws \Doctrine\DBAL\DBALException
      * @throws \Doctrine\DBAL\Schema\SchemaException
      */
-    private function synchronizeDbModel(AbstractZohoDao $dao) {
+    private function synchronizeDbModel(AbstractZohoDao $dao)
+    {
         $tableName = $this->getTableName($dao);
 
         $schema = new Schema();
@@ -61,7 +64,7 @@ class ZohoDatabaseCopier
 
         $flatFields = $this->getFlatFields($dao->getFields());
 
-        $table->addColumn("id", "string", ['length'=>100]);
+        $table->addColumn('id', 'string', ['length' => 100]);
         $table->setPrimaryKey(['id']);
 
         foreach ($flatFields as $field) {
@@ -74,37 +77,37 @@ class ZohoDatabaseCopier
             switch ($field['type']) {
                 case 'Lookup ID':
                 case 'Lookup':
-                    $type = "string";
+                    $type = 'string';
                     $length = 100;
                     $index = true;
                     break;
                 case 'OwnerLookup':
-                    $type = "string";
+                    $type = 'string';
                     $index = true;
                     $length = 25;
                     break;
                 case 'Formula':
                     // Note: a Formula can return any type, but we have no way to know which type it returns...
-                    $type = "string";
+                    $type = 'string';
                     $length = 100;
                     break;
                 case 'DateTime':
-                    $type = "datetime";
+                    $type = 'datetime';
                     break;
                 case 'Date':
-                    $type = "date";
+                    $type = 'date';
                     break;
                 case 'DateTime':
-                    $type = "datetime";
+                    $type = 'datetime';
                     break;
                 case 'Boolean':
-                    $type = "boolean";
+                    $type = 'boolean';
                     break;
                 case 'TextArea':
-                    $type = "text";
+                    $type = 'text';
                     break;
                 case 'BigInt':
-                    $type = "bigint";
+                    $type = 'bigint';
                     break;
                 case 'Phone':
                 case 'Auto Number':
@@ -114,19 +117,19 @@ class ZohoDatabaseCopier
                 case 'Website':
                 case 'Pick List':
                 case 'Multiselect Pick List':
-                    $type = "string";
+                    $type = 'string';
                     $length = $field['maxlength'];
                     break;
                 case 'Double':
                 case 'Percent':
-                    $type = "float";
+                    $type = 'float';
                     break;
                 case 'Integer':
-                    $type = "integer";
+                    $type = 'integer';
                     break;
                 case 'Currency':
                 case 'Decimal':
-                    $type = "decimal";
+                    $type = 'decimal';
                     break;
                 default:
                     throw new \RuntimeException('Unknown type "'.$field['type'].'"');
@@ -144,7 +147,7 @@ class ZohoDatabaseCopier
             $table->addColumn($columnName, $type, $options);
 
             if ($index) {
-                $table->addIndex([ $columnName ]);
+                $table->addIndex([$columnName]);
             }
         }
 
@@ -173,17 +176,18 @@ class ZohoDatabaseCopier
                 $this->connection->exec($sql);
             }
         }
-
     }
 
     /**
      * @param AbstractZohoDao $dao
-     * @param bool $incrementalSync Whether we synchronize only the modified files or everything.
+     * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
+     *
      * @throws \Doctrine\DBAL\DBALException
      * @throws \Doctrine\DBAL\Schema\SchemaException
      * @throws \Wabel\Zoho\CRM\Exception\ZohoCRMResponseException
      */
-    private function copyData(AbstractZohoDao $dao, $incrementalSync = true) {
+    private function copyData(AbstractZohoDao $dao, $incrementalSync = true)
+    {
         $tableName = $this->getTableName($dao);
 
         if ($incrementalSync) {
@@ -197,9 +201,7 @@ class ZohoDatabaseCopier
             $records = $dao->getRecords();
         }
 
-
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
-
 
         $flatFields = $this->getFlatFields($dao->getFields());
         $fieldsByName = [];
@@ -225,7 +227,7 @@ class ZohoDatabaseCopier
                 }
             }
 
-            $select->execute([ 'id' => $record->getZohoId() ]);
+            $select->execute(['id' => $record->getZohoId()]);
             $result = $select->fetch(\PDO::FETCH_ASSOC);
             if ($result === false) {
                 $data['id'] = $record->getZohoId();
@@ -237,7 +239,7 @@ class ZohoDatabaseCopier
                     $listener->onInsert($data, $dao);
                 }
             } else {
-                $identifier = ['id' => $record->getZohoId() ];
+                $identifier = ['id' => $record->getZohoId()];
                 $types['id'] = 'string';
 
                 $this->connection->update($tableName, $data, $identifier, $types);
@@ -259,6 +261,7 @@ class ZohoDatabaseCopier
         foreach ($fields as $cat) {
             $flatFields = array_merge($flatFields, $cat);
         }
+
         return $flatFields;
     }
 
@@ -266,11 +269,14 @@ class ZohoDatabaseCopier
      * Computes the name of the table based on the DAO plural module name.
      *
      * @param AbstractZohoDao $dao
+     *
      * @return string
      */
-    private function getTableName(AbstractZohoDao $dao) {
+    private function getTableName(AbstractZohoDao $dao)
+    {
         $tableName = $this->prefix.$dao->getPluralModuleName();
-        $tableName= s($tableName)->upperCamelize()->underscored();
+        $tableName = s($tableName)->upperCamelize()->underscored();
+
         return (string) $tableName;
     }
 }

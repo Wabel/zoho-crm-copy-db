@@ -1,8 +1,8 @@
 <?php
 
-
 namespace Wabel\Zoho\CRM\Copy;
 
+use Wabel\Zoho\CRM\AbstractZohoDao;
 
 class TestListener implements ZohoChangeListener
 {
@@ -12,7 +12,7 @@ class TestListener implements ZohoChangeListener
     /**
      * Function call triggered when a new field has been inserted.
      *
-     * @param array $data
+     * @param array           $data
      * @param AbstractZohoDao $dao
      */
     public function onInsert(array $data, AbstractZohoDao $dao)
@@ -23,8 +23,8 @@ class TestListener implements ZohoChangeListener
     /**
      * Function call triggered when a new field has been updated.
      *
-     * @param array $newData
-     * @param array $oldData
+     * @param array           $newData
+     * @param array           $oldData
      * @param AbstractZohoDao $dao
      */
     public function onUpdate(array $newData, array $oldData, AbstractZohoDao $dao)
@@ -33,7 +33,7 @@ class TestListener implements ZohoChangeListener
     }
 
     /**
-     * @return boolean
+     * @return bool
      */
     public function isInsertCalled()
     {
@@ -41,12 +41,10 @@ class TestListener implements ZohoChangeListener
     }
 
     /**
-     * @return boolean
+     * @return bool
      */
     public function isUpdateCalled()
     {
         return $this->updateCalled;
     }
-
-
 }

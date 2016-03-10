@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Wabel\Zoho\CRM\Copy;
-
 
 use Mouf\Utils\Common\Lock;
 use Mouf\Utils\Common\LockException;
@@ -14,7 +12,7 @@ use Wabel\Zoho\CRM\AbstractZohoDao;
 class ZohoCopyDatabaseCommand extends Command
 {
     /**
-     * The list of Zoho DAOs to copy
+     * The list of Zoho DAOs to copy.
      *
      * @var AbstractZohoDao[]
      */
@@ -31,9 +29,9 @@ class ZohoCopyDatabaseCommand extends Command
     private $lock;
 
     /**
-     * @param ZohoDatabaseCopier $zohoDatabaseCopier
-     * @param \Wabel\Zoho\CRM\AbstractZohoDao[] $zohoDaos The list of Zoho DAOs to copy
-     * @param Lock $lock A lock that can be used to avoid running the same command twice at the same time
+     * @param ZohoDatabaseCopier                $zohoDatabaseCopier
+     * @param \Wabel\Zoho\CRM\AbstractZohoDao[] $zohoDaos           The list of Zoho DAOs to copy
+     * @param Lock                              $lock               A lock that can be used to avoid running the same command twice at the same time
      */
     public function __construct(ZohoDatabaseCopier $zohoDatabaseCopier, array $zohoDaos, Lock $lock = null)
     {
@@ -56,17 +54,17 @@ class ZohoCopyDatabaseCommand extends Command
             if ($this->lock) {
                 $this->lock->acquireLock();
             }
-            $output->writeln("Starting copying Zoho data into local database.");
+            $output->writeln('Starting copying Zoho data into local database.');
             foreach ($this->zohoDaos as $zohoDao) {
-                $output->writeln(sprintf("Copying data using <info>%s</info>", get_class($zohoDao)));
+                $output->writeln(sprintf('Copying data using <info>%s</info>', get_class($zohoDao)));
                 $this->zohoDatabaseCopier->copy($zohoDao);
             }
-            $output->writeln("Zoho data successfully copied.");
+            $output->writeln('Zoho data successfully copied.');
             if ($this->lock) {
                 $this->lock->releaseLock();
             }
         } catch (LockException $e) {
-            $output->writeln("Could not start zoho:copy-db command. Another zoho:copy-db command is already running.");
+            $output->writeln('Could not start zoho:copy-db command. Another zoho:copy-db command is already running.');
         }
     }
 }

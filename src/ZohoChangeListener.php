@@ -1,4 +1,5 @@
 <?php
+
 namespace Wabel\Zoho\CRM\Copy;
 
 use Wabel\Zoho\CRM\AbstractZohoDao;
@@ -11,7 +12,7 @@ interface ZohoChangeListener
     /**
      * Function call triggered when a new field has been inserted.
      *
-     * @param array $data
+     * @param array           $data
      * @param AbstractZohoDao $dao
      */
     public function onInsert(array $data, AbstractZohoDao $dao);
@@ -19,8 +20,8 @@ interface ZohoChangeListener
     /**
      * Function call triggered when a new field has been updated.
      *
-     * @param array $newData
-     * @param array $oldData
+     * @param array           $newData
+     * @param array           $oldData
      * @param AbstractZohoDao $dao
      */
     public function onUpdate(array $newData, array $oldData, AbstractZohoDao $dao);
