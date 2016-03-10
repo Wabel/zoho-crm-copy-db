@@ -1,5 +1,5 @@
 <?php
-namespace Wabel\Zoho\CRM\Sync;
+namespace Wabel\Zoho\CRM\Copy;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -55,6 +55,8 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
 
     public function testSync()
     {
+        $listener = new TestListener();
+
         $generator = $this->getEntitiesGeneratorService();
         $generator->generateModule('Contacts', 'Contacts', 'Contact', __DIR__.'/generated/', 'TestNamespace');
 
@@ -70,9 +72,11 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
         $testContact->setEmail($testContact->getLastName().'@test.com');
         $contactZohoDao->save($testContact);
 
-        $databaseCopier = new ZohoDatabaseCopier($this->dbConnection);
+        $databaseCopier = new ZohoDatabaseCopier($this->dbConnection, "zoho_", [ $listener ]);
 
         $databaseCopier->copy($contactZohoDao);
+
+        $this->assertTrue($listener->isInsertCalled());
 
         $this->assertTrue($this->dbConnection->getSchemaManager()->tablesExist('zoho_Contacts'));
         $result = $this->dbConnection->fetchAssoc("SELECT * FROM zoho_Contacts WHERE id = :id", ["id"=>$testContact->getZohoId()]);
@@ -87,6 +91,8 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
         $result = $this->dbConnection->fetchAssoc("SELECT * FROM zoho_Contacts WHERE id = :id", ["id"=>$testContact->getZohoId()]);
         $this->assertNotFalse($result);
         $this->assertEquals($testContact->getLastName(), $result['lastName']);
+
+        $this->assertTrue($listener->isUpdateCalled());
 
         $contactZohoDao->delete($testContact->getZohoId());
     }
