@@ -62,3 +62,16 @@ Usage:
 ```sh
 $ console zoho:copy-db
 ```
+
+Listeners
+---------
+
+For each `ZohoDatabaseCopier`, you can register one or many listeners. These listeners should implement the 
+[`ZohoChangeListener`](blob/1.0/src/ZohoChangeListener.php) interface.
+
+You register those listener by passing an array of listeners to the 3rd parameter of the constructor:
+
+```php
+$listener = new MyListener();
+$databaseCopier = new ZohoDatabaseCopier($connection, "my_prefix_", [ $listener ]);
+```

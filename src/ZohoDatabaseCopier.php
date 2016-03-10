@@ -4,8 +4,8 @@ namespace Wabel\Zoho\CRM\Copy;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\SchemaDiff;
-use Doctrine\DBAL\Types\DateTimeType;
 use Wabel\Zoho\CRM\AbstractZohoDao;
+use function Stringy\create as s;
 
 /**
  * This class is in charge of synchronizing one table of your database with Zoho records.
@@ -21,13 +21,19 @@ class ZohoDatabaseCopier
     private $prefix;
 
     /**
+     * @var ZohoChangeListener[]
+     */
+    private $listeners;
+
+    /**
      * ZohoDatabaseCopier constructor.
      * @param Connection $connection
      */
-    public function __construct(Connection $connection, $prefix = "zoho_")
+    public function __construct(Connection $connection, $prefix = "zoho_", array $listeners = [])
     {
         $this->connection = $connection;
         $this->prefix = $prefix;
+        $this->listeners = $listeners;
     }
 
     /**
@@ -48,7 +54,7 @@ class ZohoDatabaseCopier
      * @throws \Doctrine\DBAL\Schema\SchemaException
      */
     private function synchronizeDbModel(AbstractZohoDao $dao) {
-        $tableName = $this->prefix.$dao->getPluralModuleName();
+        $tableName = $this->getTableName($dao);
 
         $schema = new Schema();
         $table = $schema->createTable($tableName);
@@ -178,7 +184,7 @@ class ZohoDatabaseCopier
      * @throws \Wabel\Zoho\CRM\Exception\ZohoCRMResponseException
      */
     private function copyData(AbstractZohoDao $dao, $incrementalSync = true) {
-        $tableName = $this->prefix.$dao->getPluralModuleName();
+        $tableName = $this->getTableName($dao);
 
         if ($incrementalSync) {
             // Let's get the last modification date:
@@ -226,11 +232,21 @@ class ZohoDatabaseCopier
                 $types['id'] = 'string';
 
                 $this->connection->insert($tableName, $data, $types);
+
+                foreach ($this->listeners as $listener) {
+                    $listener->onInsert($data, $dao);
+                }
             } else {
                 $identifier = ['id' => $record->getZohoId() ];
                 $types['id'] = 'string';
 
                 $this->connection->update($tableName, $data, $identifier, $types);
+
+                // Let's add the id for the update trigger
+                $data['id'] = $record->getZohoId();
+                foreach ($this->listeners as $listener) {
+                    $listener->onUpdate($data, $result, $dao);
+                }
             }
         }
 
@@ -246,4 +262,15 @@ class ZohoDatabaseCopier
         return $flatFields;
     }
 
+    /**
+     * Computes the name of the table based on the DAO plural module name.
+     *
+     * @param AbstractZohoDao $dao
+     * @return string
+     */
+    private function getTableName(AbstractZohoDao $dao) {
+        $tableName = $this->prefix.$dao->getPluralModuleName();
+        $tableName= s($tableName)->upperCamelize()->underscored();
+        return (string) $tableName;
+    }
 }
