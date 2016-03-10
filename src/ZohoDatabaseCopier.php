@@ -29,6 +29,8 @@ class ZohoDatabaseCopier
      * ZohoDatabaseCopier constructor.
      *
      * @param Connection $connection
+     * @param string $prefix Prefix for the table name in DB
+     * @param ZohoChangeListener[] $listeners The list of listeners called when a record is inserted or updated.
      */
     public function __construct(Connection $connection, $prefix = 'zoho_', array $listeners = [])
     {
