@@ -80,8 +80,8 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
 
         $this->assertTrue($listener->isInsertCalled());
 
-        $this->assertTrue($this->dbConnection->getSchemaManager()->tablesExist('zoho_Contacts'));
-        $result = $this->dbConnection->fetchAssoc('SELECT * FROM zoho_Contacts WHERE id = :id', ['id' => $testContact->getZohoId()]);
+        $this->assertTrue($this->dbConnection->getSchemaManager()->tablesExist('zoho_contacts'));
+        $result = $this->dbConnection->fetchAssoc('SELECT * FROM zoho_contacts WHERE id = :id', ['id' => $testContact->getZohoId()]);
         $this->assertNotFalse($result);
         $this->assertEquals($testContact->getLastName(), $result['lastName']);
 
@@ -90,7 +90,7 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
         $contactZohoDao->save($testContact);
 
         $databaseCopier->copy($contactZohoDao);
-        $result = $this->dbConnection->fetchAssoc('SELECT * FROM zoho_Contacts WHERE id = :id', ['id' => $testContact->getZohoId()]);
+        $result = $this->dbConnection->fetchAssoc('SELECT * FROM zoho_contacts WHERE id = :id', ['id' => $testContact->getZohoId()]);
         $this->assertNotFalse($result);
         $this->assertEquals($testContact->getLastName(), $result['lastName']);
 
