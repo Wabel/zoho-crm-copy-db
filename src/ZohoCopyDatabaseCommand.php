@@ -6,6 +6,7 @@ use Mouf\Utils\Common\Lock;
 use Mouf\Utils\Common\LockException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\OutputInterface;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 
@@ -54,6 +55,9 @@ class ZohoCopyDatabaseCommand extends Command
             if ($this->lock) {
                 $this->lock->acquireLock();
             }
+
+            $this->zohoDatabaseCopier->setLogger(new ConsoleLogger($output));
+
             $output->writeln('Starting copying Zoho data into local database.');
             foreach ($this->zohoDaos as $zohoDao) {
                 $output->writeln(sprintf('Copying data using <info>%s</info>', get_class($zohoDao)));

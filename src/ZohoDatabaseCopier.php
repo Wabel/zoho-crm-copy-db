@@ -5,6 +5,8 @@ namespace Wabel\Zoho\CRM\Copy;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\SchemaDiff;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 use function Stringy\create as s;
 
@@ -26,18 +28,37 @@ class ZohoDatabaseCopier
     private $listeners;
 
     /**
+     * @var LoggerInterface
+     */
+    private $logger;
+
+    /**
      * ZohoDatabaseCopier constructor.
      *
      * @param Connection $connection
      * @param string $prefix Prefix for the table name in DB
      * @param ZohoChangeListener[] $listeners The list of listeners called when a record is inserted or updated.
      */
-    public function __construct(Connection $connection, $prefix = 'zoho_', array $listeners = [])
+    public function __construct(Connection $connection, $prefix = 'zoho_', array $listeners = [], LoggerInterface $logger = null)
     {
         $this->connection = $connection;
         $this->prefix = $prefix;
         $this->listeners = $listeners;
+        if ($logger === null) {
+            $this->logger = new NullLogger();
+        } else {
+            $this->logger = $logger;
+        }
     }
+
+    /**
+     * @param LoggerInterface $logger
+     */
+    public function setLogger(LoggerInterface $logger)
+    {
+        $this->logger = $logger;
+    }
+
 
     /**
      * @param AbstractZohoDao $dao
@@ -60,6 +81,7 @@ class ZohoDatabaseCopier
     private function synchronizeDbModel(AbstractZohoDao $dao)
     {
         $tableName = $this->getTableName($dao);
+        $this->logger->info("Synchronizing DB Model for ".$tableName);
 
         $schema = new Schema();
         $table = $schema->createTable($tableName);
@@ -161,6 +183,7 @@ class ZohoDatabaseCopier
             $tableDiff = $comparator->diffTable($dbTable, $table);
 
             if ($tableDiff !== false) {
+                $this->logger->notice("Changes detected in table structure for ".$tableName.". Applying patch.");
                 $diff = new SchemaDiff();
                 $diff->fromSchema = $dbSchema;
                 $diff->changedTables[$tableName] = $tableDiff;
@@ -168,8 +191,11 @@ class ZohoDatabaseCopier
                 foreach ($statements as $sql) {
                     $this->connection->exec($sql);
                 }
+            } else {
+                $this->logger->info("No changes detected in table structure for ".$tableName);
             }
         } else {
+            $this->logger->notice("Creating new table '$tableName'.");
             $diff = new SchemaDiff();
             $diff->fromSchema = $dbSchema;
             $diff->newTables[$tableName] = $table;
@@ -193,15 +219,20 @@ class ZohoDatabaseCopier
         $tableName = $this->getTableName($dao);
 
         if ($incrementalSync) {
+            $this->logger->info("Copying incremental data for '$tableName'");
             // Let's get the last modification date:
             $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(lastActivityTime) FROM '.$tableName);
             if ($lastActivityTime !== null) {
                 $lastActivityTime = new \DateTime($lastActivityTime);
+                $this->logger->info("Last activity time: ".$lastActivityTime->format('c'));
             }
+
             $records = $dao->getRecords(null, null, $lastActivityTime);
         } else {
+            $this->logger->notice("Copying FULL data for '$tableName'");
             $records = $dao->getRecords();
         }
+        $this->logger->info("Fetched ".count($records)." records");
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
 
@@ -232,6 +263,8 @@ class ZohoDatabaseCopier
             $select->execute(['id' => $record->getZohoId()]);
             $result = $select->fetch(\PDO::FETCH_ASSOC);
             if ($result === false) {
+                $this->logger->info("Inserting record with ID '".$record->getZohoId()."'.");
+
                 $data['id'] = $record->getZohoId();
                 $types['id'] = 'string';
 
@@ -241,6 +274,7 @@ class ZohoDatabaseCopier
                     $listener->onInsert($data, $dao);
                 }
             } else {
+                $this->logger->info("Updating record with ID '".$record->getZohoId()."'.");
                 $identifier = ['id' => $record->getZohoId()];
                 $types['id'] = 'string';
 
