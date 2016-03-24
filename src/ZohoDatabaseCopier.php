@@ -225,6 +225,8 @@ class ZohoDatabaseCopier
             if ($lastActivityTime !== null) {
                 $lastActivityTime = new \DateTime($lastActivityTime);
                 $this->logger->info("Last activity time: ".$lastActivityTime->format('c'));
+                // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
+                $lastActivityTime->add(new \DateInterval("PT1S"));
             }
 
             $records = $dao->getRecords(null, null, $lastActivityTime);
@@ -263,7 +265,7 @@ class ZohoDatabaseCopier
             $select->execute(['id' => $record->getZohoId()]);
             $result = $select->fetch(\PDO::FETCH_ASSOC);
             if ($result === false) {
-                $this->logger->info("Inserting record with ID '".$record->getZohoId()."'.");
+                $this->logger->debug("Inserting record with ID '".$record->getZohoId()."'.");
 
                 $data['id'] = $record->getZohoId();
                 $types['id'] = 'string';
@@ -274,7 +276,7 @@ class ZohoDatabaseCopier
                     $listener->onInsert($data, $dao);
                 }
             } else {
-                $this->logger->info("Updating record with ID '".$record->getZohoId()."'.");
+                $this->logger->debug("Updating record with ID '".$record->getZohoId()."'.");
                 $identifier = ['id' => $record->getZohoId()];
                 $types['id'] = 'string';
 
