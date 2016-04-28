@@ -1,9 +1,9 @@
 [![Latest Stable Version](https://poser.pugx.org/wabel/zoho-crm-copy-db/v/stable)](https://packagist.org/packages/wabel/zoho-crm-copy-db)
 [![Latest Unstable Version](https://poser.pugx.org/wabel/zoho-crm-copy-db/v/unstable)](https://packagist.org/packages/wabel/zoho-crm-copy-db)
 [![License](https://poser.pugx.org/wabel/zoho-crm-copy-db/license)](https://packagist.org/packages/wabel/zoho-crm-copy-db)
-[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/Wabel/zoho-crm-copy-db/badges/quality-score.png?b=1.0)](https://scrutinizer-ci.com/g/Wabel/zoho-crm-copy-db/?branch=1.0)
-[![Build Status](https://travis-ci.org/Wabel/zoho-crm-copy-db.svg?branch=1.0)](https://travis-ci.org/Wabel/zoho-crm-copy-db)
-[![Coverage Status](https://coveralls.io/repos/Wabel/zoho-crm-copy-db/badge.svg?branch=1.0)](https://coveralls.io/r/Wabel/zoho-crm-copy-db?branch=1.0)
+[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/Wabel/zoho-crm-copy-db/badges/quality-score.png?b=1.1)](https://scrutinizer-ci.com/g/Wabel/zoho-crm-copy-db/?branch=1.1)
+[![Build Status](https://travis-ci.org/Wabel/zoho-crm-copy-db.svg?branch=1.1)](https://travis-ci.org/Wabel/zoho-crm-copy-db)
+[![Coverage Status](https://coveralls.io/repos/Wabel/zoho-crm-copy-db/badge.svg?branch=1.1)](https://coveralls.io/r/Wabel/zoho-crm-copy-db?branch=1.1)
 
 Wabel's Zoho-CRM Database copier
 ================================
@@ -70,7 +70,7 @@ Listeners
 ---------
 
 For each `ZohoDatabaseCopier`, you can register one or many listeners. These listeners should implement the 
-[`ZohoChangeListener`](blob/1.0/src/ZohoChangeListener.php) interface.
+[`ZohoChangeListener`](blob/1.1/src/ZohoChangeListener.php) interface.
 
 You register those listener by passing an array of listeners to the 3rd parameter of the constructor:
 
