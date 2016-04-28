@@ -1,3 +1,6 @@
+[![Latest Stable Version](https://poser.pugx.org/wabel/zoho-crm-copy-db/v/stable)](https://packagist.org/packages/wabel/zoho-crm-copy-db)
+[![Latest Unstable Version](https://poser.pugx.org/wabel/zoho-crm-copy-db/v/unstable)](https://packagist.org/packages/wabel/zoho-crm-copy-db)
+[![License](https://poser.pugx.org/wabel/zoho-crm-copy-db/license)](https://packagist.org/packages/wabel/zoho-crm-copy-db)
 [![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/Wabel/zoho-crm-copy-db/badges/quality-score.png?b=1.0)](https://scrutinizer-ci.com/g/Wabel/zoho-crm-copy-db/?branch=1.0)
 [![Build Status](https://travis-ci.org/Wabel/zoho-crm-copy-db.svg?branch=1.0)](https://travis-ci.org/Wabel/zoho-crm-copy-db)
 [![Coverage Status](https://coveralls.io/repos/Wabel/zoho-crm-copy-db/badge.svg?branch=1.0)](https://coveralls.io/r/Wabel/zoho-crm-copy-db?branch=1.0)
