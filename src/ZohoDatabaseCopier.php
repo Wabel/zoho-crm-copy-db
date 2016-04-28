@@ -33,6 +33,11 @@ class ZohoDatabaseCopier
     private $logger;
 
     /**
+     * @var LocalChangesTracker
+     */
+    private $localChangesTracker;
+
+    /**
      * ZohoDatabaseCopier constructor.
      *
      * @param Connection $connection
@@ -49,6 +54,7 @@ class ZohoDatabaseCopier
         } else {
             $this->logger = $logger;
         }
+        $this->localChangesTracker = new LocalChangesTracker($connection, $this->logger);
     }
 
     /**
@@ -64,21 +70,25 @@ class ZohoDatabaseCopier
      * @param AbstractZohoDao $dao
      * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
      */
-    public function copy(AbstractZohoDao $dao, $incrementalSync = true)
+    public function copy(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true)
     {
-        $this->synchronizeDbModel($dao);
-        $this->copyData($dao, $incrementalSync);
+        if ($twoWaysSync === true) {
+            $this->localChangesTracker->createTrackingTables();
+        }
+        $this->synchronizeDbModel($dao, $twoWaysSync);
+        $this->copyData($dao, $incrementalSync, $twoWaysSync);
+        // TODO: we need to track DELETED records in Zoho!
     }
 
     /**
      * Synchronizes the DB model with Zoho.
      *
      * @param AbstractZohoDao $dao
-     *
+     * @param bool $twoWaysSync
      * @throws \Doctrine\DBAL\DBALException
      * @throws \Doctrine\DBAL\Schema\SchemaException
      */
-    private function synchronizeDbModel(AbstractZohoDao $dao)
+    private function synchronizeDbModel(AbstractZohoDao $dao, $twoWaysSync)
     {
         $tableName = $this->getTableName($dao);
         $this->logger->info("Synchronizing DB Model for ".$tableName);
@@ -175,46 +185,26 @@ class ZohoDatabaseCopier
             }
         }
 
-        $dbSchema = $this->connection->getSchemaManager()->createSchema();
-        if ($this->connection->getSchemaManager()->tablesExist($tableName)) {
-            $dbTable = $dbSchema->getTable($tableName);
+        $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
+        $hasChanges = $dbalTableDiffService->createOrUpdateTable($table);
 
-            $comparator = new \Doctrine\DBAL\Schema\Comparator();
-            $tableDiff = $comparator->diffTable($dbTable, $table);
-
-            if ($tableDiff !== false) {
-                $this->logger->notice("Changes detected in table structure for ".$tableName.". Applying patch.");
-                $diff = new SchemaDiff();
-                $diff->fromSchema = $dbSchema;
-                $diff->changedTables[$tableName] = $tableDiff;
-                $statements = $diff->toSaveSql($this->connection->getDatabasePlatform());
-                foreach ($statements as $sql) {
-                    $this->connection->exec($sql);
-                }
-            } else {
-                $this->logger->info("No changes detected in table structure for ".$tableName);
-            }
-        } else {
-            $this->logger->notice("Creating new table '$tableName'.");
-            $diff = new SchemaDiff();
-            $diff->fromSchema = $dbSchema;
-            $diff->newTables[$tableName] = $table;
-            $statements = $diff->toSaveSql($this->connection->getDatabasePlatform());
-            foreach ($statements as $sql) {
-                $this->connection->exec($sql);
-            }
+        if ($twoWaysSync && $hasChanges) {
+            $this->localChangesTracker->createInsertTrigger($table);
+            $this->localChangesTracker->createDeleteTrigger($table);
+            $this->localChangesTracker->createUpdateTrigger($table);
         }
     }
 
     /**
      * @param AbstractZohoDao $dao
      * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
+     * @param bool            $twoWaysSync
      *
      * @throws \Doctrine\DBAL\DBALException
      * @throws \Doctrine\DBAL\Schema\SchemaException
      * @throws \Wabel\Zoho\CRM\Exception\ZohoCRMResponseException
      */
-    private function copyData(AbstractZohoDao $dao, $incrementalSync = true)
+    private function copyData(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true)
     {
         $tableName = $this->getTableName($dao);
 
@@ -230,9 +220,11 @@ class ZohoDatabaseCopier
             }
 
             $records = $dao->getRecords(null, null, $lastActivityTime);
+            $deletedRecordIds = $dao->getDeletedRecordIds($lastActivityTime);
         } else {
             $this->logger->notice("Copying FULL data for '$tableName'");
             $records = $dao->getRecords();
+            $deletedRecordIds = [];
         }
         $this->logger->info("Fetched ".count($records)." records");
 
@@ -287,6 +279,16 @@ class ZohoDatabaseCopier
                 foreach ($this->listeners as $listener) {
                     $listener->onUpdate($data, $result, $dao);
                 }
+            }
+        }
+
+        foreach ($deletedRecordIds as $id) {
+            $this->connection->delete($tableName, [ 'id' => $id ]);
+            if ($twoWaysSync) {
+                // TODO: we could detect if there are changes to be updated to the server and try to warn with a log message
+                // Also, let's remove the newly created field (because of the trigger) to avoid looping back to Zoho
+                $this->connection->delete('local_delete', [ 'table_name' => $tableName, 'id' => $id ]);
+                $this->connection->delete('local_update', [ 'table_name' => $tableName, 'id' => $id ]);
             }
         }
 
