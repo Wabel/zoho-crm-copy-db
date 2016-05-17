@@ -8,6 +8,8 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Input\InputOption;
+
 use Wabel\Zoho\CRM\AbstractZohoDao;
 
 class ZohoCopyDatabaseCommand extends Command
@@ -47,7 +49,7 @@ class ZohoCopyDatabaseCommand extends Command
         $this
             ->setName('zoho:copy-db')
             ->setDescription('Copies the Zoho database in local DB tables')
-            ->addOption("reset", "r", InputOption::VALUE_NONE, 'Get a fresh copy of Zoho (rather than doing incremental copy)', false);
+            ->addOption("reset", "r", InputOption::VALUE_NONE, 'Get a fresh copy of Zoho (rather than doing incremental copy)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
