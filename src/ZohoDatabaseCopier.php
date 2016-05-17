@@ -70,12 +70,12 @@ class ZohoDatabaseCopier
      * @param AbstractZohoDao $dao
      * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
      */
-    public function copy(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true)
+    public function copy(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true, $forceCreateTrigger = false)
     {
         if ($twoWaysSync === true) {
             $this->localChangesTracker->createTrackingTables();
         }
-        $this->synchronizeDbModel($dao, $twoWaysSync);
+        $this->synchronizeDbModel($dao, $twoWaysSync, $forceCreateTrigger);
         $this->copyData($dao, $incrementalSync, $twoWaysSync);
         // TODO: we need to track DELETED records in Zoho!
     }
@@ -88,7 +88,7 @@ class ZohoDatabaseCopier
      * @throws \Doctrine\DBAL\DBALException
      * @throws \Doctrine\DBAL\Schema\SchemaException
      */
-    private function synchronizeDbModel(AbstractZohoDao $dao, $twoWaysSync)
+    private function synchronizeDbModel(AbstractZohoDao $dao, $twoWaysSync, $forceCreateTrigger = false)
     {
         $tableName = $this->getTableName($dao);
         $this->logger->info("Synchronizing DB Model for ".$tableName);
@@ -187,8 +187,7 @@ class ZohoDatabaseCopier
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
         $hasChanges = $dbalTableDiffService->createOrUpdateTable($table);
-
-        if ($twoWaysSync && $hasChanges) {
+        if ($twoWaysSync && ($hasChanges || $forceCreateTrigger)) {
             $this->localChangesTracker->createInsertTrigger($table);
             $this->localChangesTracker->createDeleteTrigger($table);
             $this->localChangesTracker->createUpdateTrigger($table);

@@ -49,7 +49,8 @@ class ZohoCopyDatabaseCommand extends Command
         $this
             ->setName('zoho:copy-db')
             ->setDescription('Copies the Zoho database in local DB tables')
-            ->addOption("reset", "r", InputOption::VALUE_NONE, 'Get a fresh copy of Zoho (rather than doing incremental copy)');
+            ->addOption("reset", "r", InputOption::VALUE_NONE, 'Get a fresh copy of Zoho (rather than doing incremental copy)')
+            ->addOption("trigger", "t", InputOption::VALUE_NONE, 'Create or update the triggers');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -64,13 +65,19 @@ class ZohoCopyDatabaseCommand extends Command
             } else {
                 $incremental = true;
             }
-
+            
+            $forceCreateTrigger = false;
+            
+            if($input->getOption('trigger')){
+                $forceCreateTrigger = true;
+            }
+            $twoWaysSync = true;
             $this->zohoDatabaseCopier->setLogger(new ConsoleLogger($output));
 
             $output->writeln('Starting copying Zoho data into local database.');
             foreach ($this->zohoDaos as $zohoDao) {
                 $output->writeln(sprintf('Copying data using <info>%s</info>', get_class($zohoDao)));
-                $this->zohoDatabaseCopier->copy($zohoDao, $incremental);
+                $this->zohoDatabaseCopier->copy($zohoDao, $incremental, $twoWaysSync, $forceCreateTrigger);
             }
             $output->writeln('Zoho data successfully copied.');
             if ($this->lock) {
