@@ -17,12 +17,6 @@ use function Stringy\create as s;
  */
 class ZohoDatabaseSyncZoho
 {
-    /**
-     * The list of Zoho DAOs to copy.
-     *
-     * @var AbstractZohoDao[]
-     */
-    private $zohoDaos;
 
     /**
      * @var Connection
@@ -64,11 +58,12 @@ class ZohoDatabaseSyncZoho
     }
 
     /**
-     * 
+     *
+     * @param AbstractZohoDao $zohoDao
+     * @param string $localTable
      */
-    public function pushDataToZoho($localTable){
+    public function pushDataToZoho(AbstractZohoDao $zohoDao, $localTable){
 
-        foreach ($this->zohoDaos as $zohoDao) {
             $fieldsMatching = $this->findMethodValues($zohoDao);
             $tableName = $this->getTableName($zohoDao);
             $statement = $this->connection->createQueryBuilder();
@@ -96,57 +91,56 @@ class ZohoDatabaseSyncZoho
             } catch (ZohoCRMException $ex) {
                 $this->logger->error($ex->getMessage());
             }
-            
-        }
     }
 
     /**
      *
+     * @param AbstractZohoDao $zohoDao
+     * @param string $localTable
      */
-    public function deleteDataToZoho($localTable){
-
-        foreach ($this->zohoDaos as $zohoDao) {
-            $tableName = $this->getTableName($zohoDao);
-            $statement = $this->connection->createQueryBuilder();
-            $statement->select('zcrm.id')
-            ->from($localTable, 'l')
-            ->join('l', $tableName, 'zcrm', 'zcrm.id = l.id')
-            ->where('l.table_name=:table_name')
-            ->setParameters([
-                'table_name' => $tableName
-            ]);
-            $results = $statement->execute();
-            while ($row = $results->fetch()) {
-                try{
-                    $zohoDao->delete($row['id']);
-                } catch (ZohoCRMResponseException $ex) {
-                    $this->logger->error($ex->getMessage());
-                }
-                
+    public function deleteDataToZoho(AbstractZohoDao $zohoDao, $localTable){
+        $tableName = $this->getTableName($zohoDao);
+        $statement = $this->connection->createQueryBuilder();
+        $statement->select('zcrm.id')
+        ->from($localTable, 'l')
+        ->join('l', $tableName, 'zcrm', 'zcrm.id = l.id')
+        ->where('l.table_name=:table_name')
+        ->setParameters([
+            'table_name' => $tableName
+        ]);
+        $results = $statement->execute();
+        while ($row = $results->fetch()) {
+            try{
+                $zohoDao->delete($row['id']);
+            } catch (ZohoCRMResponseException $ex) {
+                $this->logger->error($ex->getMessage());
             }
-            
+
         }
-    }
+}
     
     /**
+     *
+     * @param AbstractZohoDao $zohoDao
+     */
+    public function pushInsertedRows(AbstractZohoDao $zohoDao){
+        $this->pushDataToZoho($zohoDao, 'local_insert');
+    }
+
+    /**
+     *
+     * @param AbstractZohoDao $zohoDao
+     */
+    public function pushUpdatedRows(AbstractZohoDao $zohoDao){
+        $this->pushDataToZoho($zohoDao, 'local_update');
+    }
+
+    /**
      * 
+     * @param AbstractZohoDao $zohoDao
      */
-    public function pushInsertedRows(){
-        $this->pushDataToZoho('local_insert');
-    }
-
-    /**
-     *
-     */
-    public function pushUpdatedRows(){
-        $this->pushDataToZoho('local_update');
-    }
-
-    /**
-     *
-     */
-    public function pushDeletedRows(){
-        $this->deleteDataToZoho('local_delete');
+    public function pushDeletedRows(AbstractZohoDao $zohoDao){
+        $this->deleteDataToZoho($zohoDao, 'local_delete');
     }
 
     /**
@@ -163,5 +157,15 @@ class ZohoDatabaseSyncZoho
 
         return (string) $tableName;
     }
+
+
+    /**
+     * @param LoggerInterface $logger
+     */
+    public function setLogger(LoggerInterface $logger)
+    {
+        $this->logger = $logger;
+    }
+
 
 }
