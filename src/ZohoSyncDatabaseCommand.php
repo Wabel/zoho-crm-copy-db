@@ -62,13 +62,12 @@ class ZohoSyncDatabaseCommand extends Command
 
             $output->writeln('Starting synchronize Zoho data into Zoho CRM.');
             foreach ($this->zohoDaos as $zohoDao) {
-//                $output->writeln(sprintf('Synchronizing data using <info>%s</info>', get_class($zohoDao)));
                 $output->writeln(sprintf(' > Insert new rows using <info>%s</info>', get_class($zohoDao)));
                 $this->zohoDatabaseSync->pushInsertedRows($zohoDao);
                 $output->writeln(sprintf(' > Update rows using <info>%s</info>', get_class($zohoDao)));
                 $this->zohoDatabaseSync->pushUpdatedRows($zohoDao);
                 $output->writeln(sprintf(' > Delete rows using <info>%s</info>', get_class($zohoDao)));
-                $this->zohoDatabaseSync->deleteDataToZoho($zohoDao);
+                $this->zohoDatabaseSync->pushDeletedRows($zohoDao);
             }
             $output->writeln('Zoho data successfully synchronized.');
             if ($this->lock) {

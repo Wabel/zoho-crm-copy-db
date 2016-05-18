@@ -4,6 +4,7 @@ namespace Wabel\Zoho\CRM\Copy;
 
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 use Wabel\Zoho\CRM\ZohoBeanInterface;
 use Wabel\Zoho\CRM\Exception\ZohoCRMException;
@@ -33,10 +34,15 @@ class ZohoDatabaseSyncZoho
      * @param Connection $connection
      *
      */
-    public function __construct(Connection $connection, LoggerInterface $logger)
+    public function __construct(Connection $connection, $prefix = 'zoho_', LoggerInterface $logger = null)
     {
         $this->connection = $connection;
-        $this->logger = $logger;
+        $this->prefix = $prefix;
+        if ($logger === null) {
+            $this->logger = new NullLogger();
+        } else {
+            $this->logger = $logger;
+        }
     }
 
     /**
