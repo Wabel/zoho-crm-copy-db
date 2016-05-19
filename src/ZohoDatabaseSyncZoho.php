@@ -45,19 +45,22 @@ class ZohoDatabaseSyncZoho
         }
     }
 
-    /**
+/**
      *
-     * @param array $fields
+     * @param AbstractZohoDao $zohoDao
      * @return array
      */
-    private function getFlatFields(array $fields)
-    {
-        $flatFields = [];
-        foreach ($fields as $cat) {
-            $flatFields = array_merge($flatFields, $cat);
-        }
+    private function findMethodValues(AbstractZohoDao $zohoDao){
+        $fieldsMatching = array();
+        foreach ($zohoDao->getFields() as $fieldsDescriptor) {
+            foreach (array_values($fieldsDescriptor) as $fieldDescriptor) {
+                $fieldsMatching[$fieldDescriptor['name']] = [
+                    'setter' => $fieldDescriptor['setter']
+                ];
+            }
 
-        return $flatFields;
+        }
+        return $fieldsMatching;
     }
 
     /**
@@ -67,7 +70,7 @@ class ZohoDatabaseSyncZoho
      */
     public function pushDataToZoho(AbstractZohoDao $zohoDao, $localTable){
 
-            $fieldsMatching = $this->getFlatFields($zohoDao->getFields());
+            $fieldsMatching = $this->findMethodValues($zohoDao);
             $tableName = $this->getTableName($zohoDao);
             $statement = $this->connection->createQueryBuilder();
             $statement->select('zcrm.*')
@@ -85,15 +88,22 @@ class ZohoDatabaseSyncZoho
                 /* @var $zohoBean ZohoBeanInterface */
                 $zohoBean = new $beanClassName();
                 foreach ($row as $columnName => $columnValue) {
-                    $zohoBean->{$fieldsMatching[$columnName]}($columnValue);
+                    if (in_array($columnName,['id','uid'])) {
+                        continue;
+                    }else{
+                       if($columnValue){
+                           $zohoBean->{$fieldsMatching[$columnName]['setter']}($columnValue);
+                       }
+                    }
+                    
                 }
-                $zohoBeans[] =  $zohoBean;
+                $zohoBeans[$row['uid']] =  $zohoBean;
             }
-            try{
-              $zohoDao->save($zohoBeans);  
-            } catch (ZohoCRMException $ex) {
-                $this->logger->error($ex->getMessage());
+            $zohoDao->save($zohoBeans);
+            foreach ($zohoBeans as $uid => $zohoBean) {
+                $this->connection->update($tableName, [ 'id'=>$zohoBean->getZohoId() ], ['uid'=>$uid ]);
             }
+            return $zohoBeans;
     }
 
     /**
@@ -127,7 +137,7 @@ class ZohoDatabaseSyncZoho
      * @param AbstractZohoDao $zohoDao
      */
     public function pushInsertedRows(AbstractZohoDao $zohoDao){
-        $this->pushDataToZoho($zohoDao, 'local_insert');
+        return $this->pushDataToZoho($zohoDao, 'local_insert');
     }
 
     /**
