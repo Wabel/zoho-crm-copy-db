@@ -47,20 +47,17 @@ class ZohoDatabaseSyncZoho
 
     /**
      *
-     * @param AbstractZohoDao $zohoDao
+     * @param array $fields
      * @return array
      */
-    private function findMethodValues(AbstractZohoDao $zohoDao){
-        $fieldsMatching = array();
-        foreach ($zohoDao->getFields() as $fieldsDescriptor) {
-            foreach (array_values($fieldsDescriptor) as $fieldDescriptor) {
-                $fieldsMatching[$fieldDescriptor['name']] = [
-                    'setter' => $fieldDescriptor['setter']
-                ];
-            }
-
+    private function getFlatFields(array $fields)
+    {
+        $flatFields = [];
+        foreach ($fields as $cat) {
+            $flatFields = array_merge($flatFields, $cat);
         }
-        return $fieldsMatching;
+
+        return $flatFields;
     }
 
     /**
@@ -70,7 +67,7 @@ class ZohoDatabaseSyncZoho
      */
     public function pushDataToZoho(AbstractZohoDao $zohoDao, $localTable){
 
-            $fieldsMatching = $this->findMethodValues($zohoDao);
+            $fieldsMatching = $this->getFlatFields($zohoDao->getFields());
             $tableName = $this->getTableName($zohoDao);
             $statement = $this->connection->createQueryBuilder();
             $statement->select('zcrm.*')
