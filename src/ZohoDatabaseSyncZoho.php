@@ -103,7 +103,6 @@ class ZohoDatabaseSyncZoho
             foreach ($zohoBeans as $uid => $zohoBean) {
                 $this->connection->update($tableName, [ 'id'=>$zohoBean->getZohoId() ], ['uid'=>$uid ]);
             }
-            return $zohoBeans;
     }
 
     /**
