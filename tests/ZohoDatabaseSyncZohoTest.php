@@ -46,27 +46,69 @@ class ZohoDatabaseSyncZohoTest extends \PHPUnit_Framework_TestCase
         $zohoZync= new ZohoDatabaseSyncZoho($this->dbConnection);
         $tableName = 'zoho_contacts';
         $this->assertTrue($this->dbConnection->getSchemaManager()->tablesExist($tableName));
+        // Test insert
         $data = [
             'firstName' => 'TestZohoSync',
             'lastName' => uniqid('Test'),
         ];
         $data['email'] = $data['lastName'].'@test.com';
         $this->dbConnection->insert($tableName, $data);
-        $statement = $this->dbConnection->createQueryBuilder();
-        $statement->select('zcrm.*')
+        $statementTestInsert = $this->dbConnection->createQueryBuilder();
+        $statementTestInsert->select('zcrm.*')
         ->from('local_insert', 'l')
         ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
         ->where('l.table_name=:table_name')
         ->setParameters([
             'table_name' => $tableName
         ]);
-        $result = $statement->execute()->fetchAll();
-        $this->assertNotFalse($result);
+        $resultInsertion = $statementTestInsert->execute()->fetchAll();
+        $this->assertNotFalse($resultInsertion);
         $zohoZync->pushInsertedRows($contactZohoDao);
-        $resultContact = $this->dbConnection->fetchAssoc('SELECT * FROM '.$tableName.' WHERE uid = :uid', ['uid' => $result[0]['uid']]);
-        $this->assertNotFalse($resultContact);
-        $this->assertNotNull($resultContact['id']);
+        $resultContactInserted = $this->dbConnection->fetchAssoc('SELECT * FROM '.$tableName.' WHERE uid = :uid', ['uid' => $resultInsertion[0]['uid']]);
+        $this->assertNotFalse($resultContactInserted);
+        $this->assertNotNull($resultContactInserted['id']);
 
+        //Test update
+        $dataUpdate = [
+            'firstName' => 'TestZohoSyncUpdated',
+            'lastName' => uniqid('TestUpdated'),
+        ];
+        $this->dbConnection->update($tableName, $dataUpdate, ['id' => $resultContactInserted['id']]);
+        $statementTestUpdate = $this->dbConnection->createQueryBuilder();
+        $statementTestUpdate->select('l.field_name as updated_fieldname')
+        ->from('local_update', 'l')
+        ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
+        ->where('l.table_name=:table_name')
+        ->andWhere('l.uid = :uid')
+        ->setParameters([
+            'table_name' => $tableName,
+            'uid' => $resultInsertion[0]['uid']
+        ]);
+        $resultUpdate = $statementTestUpdate->execute()->fetchAll();
+        $this->assertNotFalse($resultUpdate);
+        $this->assertCount(2, $resultUpdate);
+        $zohoZync->pushUpdatedRows($contactZohoDao);
+        //@todo: check zoho
+//        $contactZoho = $contactZohoDao->getById($resultContactInserted['id']);
+//        $this->assertEquals($dataUpdate['firstName'],$contactZoho->getFirstName());
+//        $this->assertEquals($dataUpdate['lastName'], $contactZoho->getLastName());
+
+        // Delete
+        $this->dbConnection->delete($tableName, ['uid' => $resultInsertion[0]['uid']]);
+        $statementTestDelete = $this->dbConnection->createQueryBuilder();
+        $statementTestDelete->select('l.*')
+        ->from('local_delete', 'l')
+        ->where('l.table_name=:table_name')
+        ->andWhere('l.id = :id')
+        ->setParameters([
+            'table_name' => $tableName,
+            'id' => $resultContactInserted['id']
+        ]);
+        $resultDelete= $statementTestDelete->execute()->fetchAll();
+        $this->assertNotFalse($resultDelete);
+        $zohoZync->pushDeletedRows($contactZohoDao);
+        //@todo : check zoho
+        
     }
 
     protected function tearDown()

@@ -64,17 +64,21 @@ class ZohoDatabaseSyncZoho
     }
 
     /**
-     *
+     * Insert or Update rows.
      * @param AbstractZohoDao $zohoDao
      * @param string $localTable
      */
-    public function pushDataToZoho(AbstractZohoDao $zohoDao, $localTable){
+    public function pushDataToZoho(AbstractZohoDao $zohoDao, $localTable, $update = false){
 
             $fieldsMatching = $this->findMethodValues($zohoDao);
             $tableName = $this->getTableName($zohoDao);
+            $rowsDeleted = [];
             $statement = $this->connection->createQueryBuilder();
-            $statement->select('zcrm.*')
-            ->from($localTable, 'l')
+            $statement->select('zcrm.*');
+            if($update){
+                $statement->addSelect('l.field_name as updated_fieldname');
+            }
+            $statement->from($localTable, 'l')
             ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
             ->where('l.table_name=:table_name')
             ->setParameters([
@@ -87,52 +91,66 @@ class ZohoDatabaseSyncZoho
                 $beanClassName = $zohoDao->getBeanClassName();
                 /* @var $zohoBean ZohoBeanInterface */
                 $zohoBean = new $beanClassName();
-                foreach ($row as $columnName => $columnValue) {
-                    if (in_array($columnName,['id','uid'])) {
+                if(!$update){
+                    foreach ($row as $columnName => $columnValue) {
+                        if (in_array($columnName,['id','uid'])) {
+                            continue;
+                        }else{
+                           if($columnValue){
+                               $zohoBean->{$fieldsMatching[$columnName]['setter']}($columnValue);
+                           }
+                        }
+
+                    }
+                    $zohoBeans[$row['uid']] =  $zohoBean;
+                    $rowsDeleted[] = $row['uid'];
+                } else{
+                    $columnName = $row['updated_fieldname'];
+                    $zohoBean->setZohoId($row['id']);
+                    if (in_array($columnName,['uid'])) {
                         continue;
                     }else{
-                       if($columnValue){
-                           $zohoBean->{$fieldsMatching[$columnName]['setter']}($columnValue);
-                       }
+                        $zohoBean->{$fieldsMatching[$columnName]['setter']}($row[$columnName]);
+                        $zohoBeans[] = $zohoBean;
+                        $rowsDeleted[] = $row['uid'];
                     }
-                    
                 }
-                $zohoBeans[$row['uid']] =  $zohoBean;
             }
             $zohoDao->save($zohoBeans);
-            foreach ($zohoBeans as $uid => $zohoBean) {
-                $this->connection->update($tableName, [ 'id'=>$zohoBean->getZohoId() ], ['uid'=>$uid ]);
+            if(!$update){
+                foreach ($zohoBeans as $uid => $zohoBean) {
+                    $this->connection->update($tableName, [ 'id'=>$zohoBean->getZohoId(),'lastActivityTime'=> date("Y-m-d H:i:s") ], ['uid'=>$uid ]);
+                }
             }
+            $statementDelete = $this->connection->prepare('delete from '.$localTable.' where uid in ( :rowsDeleted)');
+            $statementDelete->execute([
+                'rowsDeleted' => implode(',', $rowsDeleted)
+            ]);
     }
 
     /**
-     *
+     * Find the row to delete and remove to Zoho.
      * @param AbstractZohoDao $zohoDao
      * @param string $localTable
      */
     public function deleteDataToZoho(AbstractZohoDao $zohoDao, $localTable){
         $tableName = $this->getTableName($zohoDao);
         $statement = $this->connection->createQueryBuilder();
-        $statement->select('zcrm.id')
+        $statement->select('l.id')
         ->from($localTable, 'l')
-        ->join('l', $tableName, 'zcrm', 'zcrm.id = l.id')
         ->where('l.table_name=:table_name')
         ->setParameters([
             'table_name' => $tableName
         ]);
         $results = $statement->execute();
         while ($row = $results->fetch()) {
-            try{
-                $zohoDao->delete($row['id']);
-            } catch (ZohoCRMResponseException $ex) {
-                $this->logger->error($ex->getMessage());
-            }
-
+            $zohoDao->delete($row['id']);
+            $this->connection->delete($localTable, ['table_name' => $tableName,'id' => $row['id']]);
         }
 }
     
     /**
-     *
+     * Run inserted rows to Zoho : local_insert.
      * @param AbstractZohoDao $zohoDao
      */
     public function pushInsertedRows(AbstractZohoDao $zohoDao){
@@ -140,15 +158,15 @@ class ZohoDatabaseSyncZoho
     }
 
     /**
-     *
+     * Run updated rows to Zoho : local_update.
      * @param AbstractZohoDao $zohoDao
      */
     public function pushUpdatedRows(AbstractZohoDao $zohoDao){
-        $this->pushDataToZoho($zohoDao, 'local_update');
+        $this->pushDataToZoho($zohoDao, 'local_update', true);
     }
 
     /**
-     * 
+     * Run deleted rows to Zoho : local_delete.
      * @param AbstractZohoDao $zohoDao
      */
     public function pushDeletedRows(AbstractZohoDao $zohoDao){

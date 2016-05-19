@@ -289,7 +289,7 @@ class ZohoDatabaseCopier
             if ($twoWaysSync) {
                 // TODO: we could detect if there are changes to be updated to the server and try to warn with a log message
                 // Also, let's remove the newly created field (because of the trigger) to avoid looping back to Zoho
-                $this->connection->delete('local_delete', [ 'table_name' => $tableName, 'uid' => $uid ]);
+                $this->connection->delete('local_delete', [ 'table_name' => $tableName, 'id' => $id ]);
                 $this->connection->delete('local_update', [ 'table_name' => $tableName, 'uid' => $uid ]);
             }
         }

@@ -38,19 +38,21 @@ class LocalChangesTracker
 
         $localUpdate = $schema->createTable("local_update");
         $localUpdate->addColumn("table_name", 'string', ['length' => 100]);
-        $localUpdate->addColumn("uid", 'string', ['length' => 100]);
+        $localUpdate->addColumn("uid", 'integer');
         $localUpdate->addColumn("field_name", 'string', ['length' => 100]);
         $localUpdate->setPrimaryKey(array("table_name", "uid", "field_name"));
 
         $localInsert = $schema->createTable("local_insert");
         $localInsert->addColumn("table_name", 'string', ['length' => 100]);
-        $localInsert->addColumn("uid", 'string', ['length' => 100]);
+        $localInsert->addColumn("uid", 'integer');
         $localInsert->setPrimaryKey(array("table_name", "uid"));
 
         $localDelete = $schema->createTable("local_delete");
         $localDelete->addColumn("table_name", 'string', ['length' => 100]);
-        $localDelete->addColumn("uid", 'string', ['length' => 100]);
+        $localDelete->addColumn("uid", 'integer');
+        $localDelete->addColumn("id",  'string', ['length' => 100]);
         $localDelete->setPrimaryKey(array("table_name", "uid"));
+        $localDelete->addUniqueIndex(['id','table_name']);
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
         $dbalTableDiffService->createOrUpdateTable($localUpdate);
@@ -91,7 +93,7 @@ class LocalChangesTracker
             CREATE TRIGGER %s BEFORE DELETE ON `%s` 
             FOR EACH ROW
             BEGIN
-              INSERT INTO local_delete VALUES (%s, OLD.uid);
+              INSERT INTO local_delete VALUES (%s, OLD.uid, OLD.id);
               DELETE FROM local_insert WHERE table_name = %s AND uid = OLD.uid;
               DELETE FROM local_update WHERE table_name = %s AND uid = OLD.uid;
             END;
