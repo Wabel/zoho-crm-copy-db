@@ -75,7 +75,7 @@ class ZohoDatabaseSyncZoho
             $statement = $this->connection->createQueryBuilder();
             $statement->select('zcrm.*')
             ->from($localTable, 'l')
-            ->join('l', $tableName, 'zcrm', 'zcrm.id = l.id')
+            ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
             ->where('l.table_name=:table_name')
             ->setParameters([
                 'table_name' => $tableName

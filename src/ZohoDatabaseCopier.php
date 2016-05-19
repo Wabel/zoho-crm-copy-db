@@ -97,9 +97,10 @@ class ZohoDatabaseCopier
         $table = $schema->createTable($tableName);
 
         $flatFields = $this->getFlatFields($dao->getFields());
-
+        $table->addColumn('uid', 'integer', ['autoincrement' => true]);
         $table->addColumn('id', 'string', ['length' => 100]);
-        $table->setPrimaryKey(['id']);
+        $table->addUniqueIndex(['id']);
+        $table->setPrimaryKey(['uid']);
 
         foreach ($flatFields as $field) {
             $columnName = $field['name'];
