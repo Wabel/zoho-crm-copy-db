@@ -244,9 +244,10 @@ class ZohoDatabaseCopier
             $data = [];
             $types = [];
             foreach ($table->getColumns() as $column) {
-                if ($column->getName() === 'id') {
+                if (in_array($column->getName(),['id','uid'])) {
                     continue;
-                } else {
+                }
+                else {
                     $field = $fieldsByName[$column->getName()];
                     $getterName = $field['getter'];
                     $data[$column->getName()] = $record->$getterName();
@@ -281,14 +282,15 @@ class ZohoDatabaseCopier
                 }
             }
         }
-
+        $sqlStatementUid = 'select uid from '.$this->connection->quoteIdentifier($tableName).' where id = :id';
         foreach ($deletedRecordIds as $id) {
+            $uid = $this->connection->fetchColumn($sqlStatementUid, ['id' => $id]);
             $this->connection->delete($tableName, [ 'id' => $id ]);
             if ($twoWaysSync) {
                 // TODO: we could detect if there are changes to be updated to the server and try to warn with a log message
                 // Also, let's remove the newly created field (because of the trigger) to avoid looping back to Zoho
-                $this->connection->delete('local_delete', [ 'table_name' => $tableName, 'id' => $id ]);
-                $this->connection->delete('local_update', [ 'table_name' => $tableName, 'id' => $id ]);
+                $this->connection->delete('local_delete', [ 'table_name' => $tableName, 'uid' => $uid ]);
+                $this->connection->delete('local_update', [ 'table_name' => $tableName, 'uid' => $uid ]);
             }
         }
 
