@@ -81,10 +81,13 @@ class ZohoCopyDatabaseCommand extends Command
                 throw new InvalidArgumentException('Named argument not found.');
                 break;
         }
-        
-
     }
 
+    /**
+     * Run the copy Db command.
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     */
     private function copyDb(InputInterface $input, OutputInterface $output){
         try {
             if ($this->lockCopy) {
@@ -119,6 +122,11 @@ class ZohoCopyDatabaseCommand extends Command
         }
     }
 
+    /**
+     * Run he sync Db command.
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     */
     private function syncDb(InputInterface $input, OutputInterface $output){
         try {
             if ($this->lockSync) {
