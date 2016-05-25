@@ -43,9 +43,12 @@ class ZohoCopyDatabaseCommand extends Command
     private $lockSync;
 
     /**
-     * @param ZohoDatabaseCopier                $zohoDatabaseCopier
-     * @param \Wabel\Zoho\CRM\AbstractZohoDao[] $zohoDaos           The list of Zoho DAOs to copy
-     * @param Lock                              $lock               A lock that can be used to avoid running the same command twice at the same time
+     * 
+     * @param \Wabel\Zoho\CRM\Copy\ZohoDatabaseCopier $zohoDatabaseCopier
+     * @param \Wabel\Zoho\CRM\Copy\ZohoDatabaseSyncZoho $zohoDatabaseSync
+     * @param array $zohoDaos The list of Zoho DAOs to copy
+     * @param Lock $lockCopy A lock that can be used to avoid running the same command (copy) twice at the same time
+     * @param Lock $lockSync A lock that can be used to avoid running the same command (sync) twice at the same time
      */
     public function __construct(ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabaseSyncZoho $zohoDatabaseSync, array $zohoDaos, Lock $lockCopy = null, Lock $lockSync = null)
     {
@@ -75,11 +78,10 @@ class ZohoCopyDatabaseCommand extends Command
                 $this->copyDb($input, $output);
                 break;
             case 'sync':
-                $this->syncDb($input, $output);
+                $this->syncDb($output);
                 break;
             default:
                 throw new InvalidArgumentException('Named argument not found.');
-                break;
         }
     }
 
@@ -127,7 +129,7 @@ class ZohoCopyDatabaseCommand extends Command
      * @param InputInterface $input
      * @param OutputInterface $output
      */
-    private function syncDb(InputInterface $input, OutputInterface $output){
+    private function syncDb(OutputInterface $output){
         try {
             if ($this->lockSync) {
                 $this->lockSync->acquireLock();
