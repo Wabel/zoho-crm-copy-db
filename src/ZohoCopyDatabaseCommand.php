@@ -126,7 +126,6 @@ class ZohoCopyDatabaseCommand extends Command
 
     /**
      * Run he sync Db command.
-     * @param InputInterface $input
      * @param OutputInterface $output
      */
     private function syncDb(OutputInterface $output){
