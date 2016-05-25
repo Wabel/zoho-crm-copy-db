@@ -50,6 +50,7 @@ class ZohoDatabaseSyncZohoTest extends \PHPUnit_Framework_TestCase
         $data = [
             'firstName' => 'TestZohoSync',
             'lastName' => uniqid('Test'),
+            'dateOfBirth' => date('Y-m-d')
         ];
         $data['email'] = $data['lastName'].'@test.com';
         $this->dbConnection->insert($tableName, $data);
@@ -67,7 +68,7 @@ class ZohoDatabaseSyncZohoTest extends \PHPUnit_Framework_TestCase
         $resultContactInserted = $this->dbConnection->fetchAssoc('SELECT * FROM '.$tableName.' WHERE uid = :uid', ['uid' => $resultInsertion[0]['uid']]);
         $this->assertNotFalse($resultContactInserted);
         $this->assertNotNull($resultContactInserted['id']);
-
+        
         //Test update
         $dataUpdate = [
             'firstName' => 'TestZohoSyncUpdated',
@@ -88,10 +89,10 @@ class ZohoDatabaseSyncZohoTest extends \PHPUnit_Framework_TestCase
         $this->assertNotFalse($resultUpdate);
         $this->assertCount(2, $resultUpdate);
         $zohoZync->pushUpdatedRows($contactZohoDao);
-        //@todo: check zoho
-//        $contactZoho = $contactZohoDao->getById($resultContactInserted['id']);
-//        $this->assertEquals($dataUpdate['firstName'],$contactZoho->getFirstName());
-//        $this->assertEquals($dataUpdate['lastName'], $contactZoho->getLastName());
+        sleep(60);
+        $contactZohoUpdate = $contactZohoDao->getById($resultContactInserted['id']);
+        $this->assertEquals($dataUpdate['firstName'],$contactZohoUpdate->getFirstName());
+        $this->assertEquals($dataUpdate['lastName'], $contactZohoUpdate->getLastName());
 
         // Delete
         $this->dbConnection->delete($tableName, ['uid' => $resultInsertion[0]['uid']]);
@@ -107,7 +108,6 @@ class ZohoDatabaseSyncZohoTest extends \PHPUnit_Framework_TestCase
         $resultDelete= $statementTestDelete->execute()->fetchAll();
         $this->assertNotFalse($resultDelete);
         $zohoZync->pushDeletedRows($contactZohoDao);
-        //@todo : check zoho
         
     }
 

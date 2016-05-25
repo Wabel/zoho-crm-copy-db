@@ -61,7 +61,8 @@ class ZohoDatabaseSyncZoho
         foreach ($zohoDao->getFields() as $fieldsDescriptor) {
             foreach (array_values($fieldsDescriptor) as $fieldDescriptor) {
                 $fieldsMatching[$fieldDescriptor['name']] = [
-                    'setter' => $fieldDescriptor['setter']
+                    'setter' => $fieldDescriptor['setter'],
+                    'type' => $fieldDescriptor['type']
                 ];
             }
 
@@ -96,28 +97,29 @@ class ZohoDatabaseSyncZoho
             while ($row = $results->fetch()) {
                 $beanClassName = $zohoDao->getBeanClassName();
                 /* @var $zohoBean ZohoBeanInterface */
-                $zohoBean = new $beanClassName();
+                if(isset($zohoBeans[$row['uid']])){
+                    $zohoBean = $zohoBeans[$row['uid']];
+                }else{
+                    $zohoBean = new $beanClassName();
+                }
                 if(!$update){
                     foreach ($row as $columnName => $columnValue) {
-                        if (in_array($columnName,['id','uid'])) {
-                            continue;
-                        }else{
+                        if (!in_array($columnName,['id','uid']) || isset($fieldsMatching[$columnName])) {
+                            $value = $this->formatValueToBeans($zohoDao->getModule(), $fieldsMatching, $columnName, $columnValue, null, $row['uid']);
                            if($columnValue){
-                               $zohoBean->{$fieldsMatching[$columnName]['setter']}($columnValue);
+                               $zohoBean->{$fieldsMatching[$columnName]['setter']}($value);
                            }
                         }
-
                     }
                     $zohoBeans[$row['uid']] =  $zohoBean;
                     $rowsDeleted[] = $row['uid'];
                 } else{
                     $columnName = $row['updated_fieldname'];
                     $zohoBean->setZohoId($row['id']);
-                    if (in_array($columnName,['uid'])) {
-                        continue;
-                    }else{
-                        $zohoBean->{$fieldsMatching[$columnName]['setter']}($row[$columnName]);
-                        $zohoBeans[] = $zohoBean;
+                    if (!in_array($columnName,['id','uid']) || isset($fieldsMatching[$columnName])) {
+                        $value = $this->formatValueToBeans($zohoDao->getModule(), $fieldsMatching, $columnName, $row[$columnName], $row['id']);
+                        $zohoBean->{$fieldsMatching[$columnName]['setter']}($value);
+                        $zohoBeans[$row['uid']] = $zohoBean;
                         $rowsDeleted[] = $row['uid'];
                     }
                 }
@@ -132,6 +134,40 @@ class ZohoDatabaseSyncZoho
             $statementDelete->execute([
                 'rowsDeleted' => implode(',', $rowsDeleted)
             ]);
+    }
+
+    /**
+     * Change the value to the good format.
+     * @param string $moduleName
+     * @param array $fieldsMatching
+     * @param string $columnName
+     * @param mixed $value
+     * @param int $id
+     * @return mixed
+     * @throws ZohoCRMException
+     */
+    private function formatValueToBeans($moduleName, $fieldsMatching,$columnName,$value,$id=null, $uid = null)
+    {
+        $idrecord = $id?$id.'[ZOHO]':$uid.'[UID]';
+        if(isset($fieldsMatching[$columnName]) && $value){
+            switch ($fieldsMatching[$columnName]['type']) {
+                case 'Date':
+                    if ($dateObj = \DateTime::createFromFormat('M/d/Y', $value)) {
+                        $value = $dateObj;
+                    } elseif ($dateObj = \DateTime::createFromFormat('Y-m-d', $value)) {
+                        $value = $dateObj;
+                    } else {
+                        throw new ZohoCRMException('Unable to convert the Date field "'.$columnName."\" into a DateTime PHP object from the the record $idrecord of the module ".$moduleName.'.');
+                    }
+                    break;
+                case 'DateTime':
+                    $value = \DateTime::createFromFormat('Y-m-d H:i:s', $value);
+                    break;
+                default:
+                    break;
+            }
+        }
+        return $value;
     }
 
     /**
