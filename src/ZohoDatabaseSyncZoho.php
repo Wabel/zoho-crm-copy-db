@@ -30,9 +30,15 @@ class ZohoDatabaseSyncZoho
     private $logger;
 
     /**
-     * @param \Wabel\Zoho\CRM\AbstractZohoDao[] $zohoDaos           The list of Zoho DAOs to copy
-     * @param Connection $connection
      *
+     * @var string
+     */
+    private $prefix;
+
+    /**
+     * @param Connection $connection
+     * @param string $prefix
+     * @param LoggerInterface $logger
      */
     public function __construct(Connection $connection, $prefix = 'zoho_', LoggerInterface $logger = null)
     {
@@ -45,7 +51,7 @@ class ZohoDatabaseSyncZoho
         }
     }
 
-/**
+    /**
      *
      * @param AbstractZohoDao $zohoDao
      * @return array
