@@ -8,8 +8,6 @@ use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 use Wabel\Zoho\CRM\ZohoBeanInterface;
 use Wabel\Zoho\CRM\Exception\ZohoCRMException;
-use Wabel\Zoho\CRM\Exception\ZohoCRMResponseException;
-use function Stringy\create as s;
 
 /**
  * Description of ZohoDatabaseSyncZoho
@@ -78,7 +76,7 @@ class ZohoDatabaseSyncZoho
     public function pushDataToZoho(AbstractZohoDao $zohoDao, $localTable, $update = false){
 
             $fieldsMatching = $this->findMethodValues($zohoDao);
-            $tableName = $this->getTableName($zohoDao);
+            $tableName = ZohoDatabaseHelper::getTableName($zohoDao,$this->prefix);
             $rowsDeleted = [];
             $statement = $this->connection->createQueryBuilder();
             $statement->select('zcrm.*');
@@ -176,7 +174,7 @@ class ZohoDatabaseSyncZoho
      * @param string $localTable
      */
     public function deleteDataToZoho(AbstractZohoDao $zohoDao, $localTable){
-        $tableName = $this->getTableName($zohoDao);
+        $tableName = ZohoDatabaseHelper::getTableName($zohoDao,$this->prefix);
         $statement = $this->connection->createQueryBuilder();
         $statement->select('l.id')
         ->from($localTable, 'l')
@@ -214,22 +212,6 @@ class ZohoDatabaseSyncZoho
     public function pushDeletedRows(AbstractZohoDao $zohoDao){
         $this->deleteDataToZoho($zohoDao, 'local_delete');
     }
-
-    /**
-     * Computes the name of the table based on the DAO plural module name.
-     *
-     * @param AbstractZohoDao $dao
-     *
-     * @return string
-     */
-    private function getTableName(AbstractZohoDao $dao)
-    {
-        $tableName = $this->prefix.$dao->getPluralModuleName();
-        $tableName = s($tableName)->upperCamelize()->underscored();
-
-        return (string) $tableName;
-    }
-
 
     /**
      * @param LoggerInterface $logger

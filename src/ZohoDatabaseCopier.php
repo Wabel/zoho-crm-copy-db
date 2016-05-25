@@ -8,7 +8,6 @@ use Doctrine\DBAL\Schema\SchemaDiff;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
-use function Stringy\create as s;
 
 /**
  * This class is in charge of synchronizing one table of your database with Zoho records.
@@ -90,7 +89,7 @@ class ZohoDatabaseCopier
      */
     private function synchronizeDbModel(AbstractZohoDao $dao, $twoWaysSync, $forceCreateTrigger = false)
     {
-        $tableName = $this->getTableName($dao);
+        $tableName = ZohoDatabaseHelper::getTableName($dao,$this->prefix);
         $this->logger->info("Synchronizing DB Model for ".$tableName);
 
         $schema = new Schema();
@@ -206,7 +205,7 @@ class ZohoDatabaseCopier
      */
     private function copyData(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true)
     {
-        $tableName = $this->getTableName($dao);
+        $tableName = ZohoDatabaseHelper::getTableName($dao,$this->prefix);
 
         if ($incrementalSync) {
             $this->logger->info("Copying incremental data for '$tableName'");
@@ -307,18 +306,4 @@ class ZohoDatabaseCopier
         return $flatFields;
     }
 
-    /**
-     * Computes the name of the table based on the DAO plural module name.
-     *
-     * @param AbstractZohoDao $dao
-     *
-     * @return string
-     */
-    private function getTableName(AbstractZohoDao $dao)
-    {
-        $tableName = $this->prefix.$dao->getPluralModuleName();
-        $tableName = s($tableName)->upperCamelize()->underscored();
-
-        return (string) $tableName;
-    }
 }
