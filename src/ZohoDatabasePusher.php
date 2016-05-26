@@ -70,7 +70,6 @@ class ZohoDatabasePusher
     /**
      * Insert or Update rows.
      * @param AbstractZohoDao $zohoDao
-     * @param string $localTable
      */
     public function pushDataToZoho(AbstractZohoDao $zohoDao, $update = false){
         $localTable = $update ? 'local_update' : 'local_insert';
