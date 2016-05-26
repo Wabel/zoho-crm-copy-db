@@ -26,4 +26,14 @@ class ZohoDatabaseHelper
 
         return (string) $tableName;
     }
+
+    public static function getFlatFields(array $fields)
+    {
+        $flatFields = [];
+        foreach ($fields as $cat) {
+            $flatFields = array_merge($flatFields, $cat);
+        }
+
+        return $flatFields;
+    }
 }

@@ -64,136 +64,6 @@ class ZohoDatabaseCopier
         $this->logger = $logger;
     }
 
-
-    /**
-     * @param AbstractZohoDao $dao
-     * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
-     */
-    public function copy(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true, $forceCreateTrigger = false)
-    {
-        if ($twoWaysSync === true) {
-            $this->localChangesTracker->createTrackingTables();
-        }
-        $this->synchronizeDbModel($dao, $twoWaysSync, $forceCreateTrigger);
-        $this->copyData($dao, $incrementalSync, $twoWaysSync);
-        // TODO: we need to track DELETED records in Zoho!
-    }
-
-    /**
-     * Synchronizes the DB model with Zoho.
-     *
-     * @param AbstractZohoDao $dao
-     * @param bool $twoWaysSync
-     * @throws \Doctrine\DBAL\DBALException
-     * @throws \Doctrine\DBAL\Schema\SchemaException
-     */
-    private function synchronizeDbModel(AbstractZohoDao $dao, $twoWaysSync, $forceCreateTrigger = false)
-    {
-        $tableName = ZohoDatabaseHelper::getTableName($dao,$this->prefix);
-        $this->logger->info("Synchronizing DB Model for ".$tableName);
-
-        $schema = new Schema();
-        $table = $schema->createTable($tableName);
-
-        $flatFields = $this->getFlatFields($dao->getFields());
-        $table->addColumn('uid', 'integer', ['autoincrement' => true]);
-        $table->addColumn('id', 'string', ['length' => 100]);
-        $table->addUniqueIndex(['id']);
-        $table->setPrimaryKey(['uid']);
-
-        foreach ($flatFields as $field) {
-            $columnName = $field['name'];
-
-            $length = null;
-            $index = false;
-
-            // Note: full list of types available here: https://www.zoho.com/crm/help/customization/custom-fields.html
-            switch ($field['type']) {
-                case 'Lookup ID':
-                case 'Lookup':
-                    $type = 'string';
-                    $length = 100;
-                    $index = true;
-                    break;
-                case 'OwnerLookup':
-                    $type = 'string';
-                    $index = true;
-                    $length = 25;
-                    break;
-                case 'Formula':
-                    // Note: a Formula can return any type, but we have no way to know which type it returns...
-                    $type = 'string';
-                    $length = 100;
-                    break;
-                case 'DateTime':
-                    $type = 'datetime';
-                    break;
-                case 'Date':
-                    $type = 'date';
-                    break;
-                case 'DateTime':
-                    $type = 'datetime';
-                    break;
-                case 'Boolean':
-                    $type = 'boolean';
-                    break;
-                case 'TextArea':
-                    $type = 'text';
-                    break;
-                case 'BigInt':
-                    $type = 'bigint';
-                    break;
-                case 'Phone':
-                case 'Auto Number':
-                case 'Text':
-                case 'URL':
-                case 'Email':
-                case 'Website':
-                case 'Pick List':
-                case 'Multiselect Pick List':
-                    $type = 'string';
-                    $length = $field['maxlength'];
-                    break;
-                case 'Double':
-                case 'Percent':
-                    $type = 'float';
-                    break;
-                case 'Integer':
-                    $type = 'integer';
-                    break;
-                case 'Currency':
-                case 'Decimal':
-                    $type = 'decimal';
-                    break;
-                default:
-                    throw new \RuntimeException('Unknown type "'.$field['type'].'"');
-            }
-
-            $options = [];
-
-            if ($length) {
-                $options['length'] = $length;
-            }
-
-            //$options['notnull'] = $field['req'];
-            $options['notnull'] = false;
-
-            $table->addColumn($columnName, $type, $options);
-
-            if ($index) {
-                $table->addIndex([$columnName]);
-            }
-        }
-
-        $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
-        $hasChanges = $dbalTableDiffService->createOrUpdateTable($table);
-        if ($twoWaysSync && ($hasChanges || $forceCreateTrigger)) {
-            $this->localChangesTracker->createInsertTrigger($table);
-            $this->localChangesTracker->createDeleteTrigger($table);
-            $this->localChangesTracker->createUpdateTrigger($table);
-        }
-    }
-
     /**
      * @param AbstractZohoDao $dao
      * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
@@ -203,7 +73,7 @@ class ZohoDatabaseCopier
      * @throws \Doctrine\DBAL\Schema\SchemaException
      * @throws \Wabel\Zoho\CRM\Exception\ZohoCRMResponseException
      */
-    private function copyData(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true)
+    public function fetchFromZoho(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true)
     {
         $tableName = ZohoDatabaseHelper::getTableName($dao,$this->prefix);
 
@@ -229,7 +99,7 @@ class ZohoDatabaseCopier
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
 
-        $flatFields = $this->getFlatFields($dao->getFields());
+        $flatFields = ZohoDatabaseHelper::getFlatFields($dao->getFields());
         $fieldsByName = [];
         foreach ($flatFields as $field) {
             $fieldsByName[$field['name']] = $field;
@@ -294,16 +164,6 @@ class ZohoDatabaseCopier
         }
 
         $this->connection->commit();
-    }
-
-    private function getFlatFields(array $fields)
-    {
-        $flatFields = [];
-        foreach ($fields as $cat) {
-            $flatFields = array_merge($flatFields, $cat);
-        }
-
-        return $flatFields;
     }
 
 }

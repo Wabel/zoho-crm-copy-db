@@ -20,9 +20,9 @@ so if you do not know this library, [STOP READING NOW and follow this link](http
 
 How does it work?
 -----------------
-This projects provides a `ZohoDatabaseCopier` class, with a simple `copy` method. This method takes a `ZohoDao` in argument.
+This projects provides a `ZohoDatabaseCopier` class, with a simple `fetchFromZoho` method. This method takes a `ZohoDao` in argument.
 `ZohoDaos` can be created using the [ZohoCRM ORM](https://github.com/Wabel/zoho-crm-orm).
-It provides also a `ZohoDatabaseSyncZoho` class with methods to insert, update and delete data to Zoho CRM.
+It also provides a `ZohoDatabasePusher` class with a  `pushToZoho` method to push data to Zoho CRM.
 
 -----------------
 <h4>ZohoDatabaseCopier</h4>
@@ -34,7 +34,7 @@ Usage:
 $databaseCopier = new ZohoDatabaseCopier($connection);
 
 // $contactZohoDao is the Zoho Dao to the module you want to copy.
-$databaseCopier->copy($contactZohoDao);
+$databaseCopier->fetchFromZoho($contactZohoDao);
 ```
 
 The copy command will create a 'zoho_Contacts' table in your database and copy all data from Zoho.
@@ -52,24 +52,19 @@ everything, you can use the second parameter of the `copy` method:
  
 ```php
 // Pass false as second parameter to force copying everything rather than doing an incremental copy.
-$databaseCopier->copy($contactZohoDao, false);
+$databaseCopier->fetchFromZoho($contactZohoDao, false);
 ```
 -----------------
-<h4>ZohoDatabaseSyncZoho</h4>
+<h4>ZohoDatabasePusher</h4>
 
 Usage:
 
 ```php
 // $connection is a Doctrine DBAL connection to your database.
-$databaseSync = new ZohoDatabaseSyncZoho($connection);
+$databaseSync = new ZohoDatabasePusher($connection);
 
-// $contactZohoDao is the Zoho Dao to the module you want to copy.
-//pushInsertedRows method to push the new rows to Zoho
-$databaseSync->pushInsertedRows($contactZohoDao);
-//pushInsertedRows method to push the updated rows to Zoho
-$databaseSync->pushUpdatedRows($contactZohoDao);
-//pushDeletedRows method to delete the deleted rows to Zoho
-$databaseSync->pushDeletedRows($contactZohoDao);
+// $contactZohoDao is the Zoho Dao to the module you want to push.
+$databaseSync->pushToZoho($contactZohoDao);
 ```
 
 Symfony command
@@ -77,15 +72,17 @@ Symfony command
 
 The project also comes with a Symfony Command that you can use to easily copy tables.
 
-The command's constructor takes in parameter a `ZohoDatabaseCopier` instance, a`ZohoDatabaseSyncZoho` instance and a list of `ZohoDAOs`.
+The command's constructor takes in parameter a `ZohoDatabaseCopier` instance, a`ZohoDatabasePusher` instance and a list of `ZohoDAOs`.
 
 Usage:
 
 ```sh
-# Command to copy data
-$ console zoho:copy-db copy
-# Command to synchronize data
-$ console zoho:copy-db sync
+# Command to synchronize data (both ways)
+$ console zoho:sync
+# Command to only fetch data from Zoho
+$ console zoho:sync --fetch-only
+# Command to only push data to Zoho
+$ console zoho:sync --push-only
 ```
 
 Listeners

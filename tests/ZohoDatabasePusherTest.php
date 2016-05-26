@@ -9,8 +9,9 @@ use TestNamespace\Contact;
 use TestNamespace\ContactZohoDao;
 use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 use Wabel\Zoho\CRM\ZohoClient;
+use Wabel\Zoho\CRM\Exception\ZohoCRMResponseException;
 
-class ZohoDatabaseSyncZohoTest extends \PHPUnit_Framework_TestCase
+class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
 {
     /**
      * @var Connection
@@ -38,12 +39,12 @@ class ZohoDatabaseSyncZohoTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @depends Wabel\Zoho\CRM\Copy\ZohoDatabaseCopierTest::testSync
+     * @depends Wabel\Zoho\CRM\Copy\ZohoDatabaseCopierTest::testFetch
      */
     public function testSync()
     {
         $contactZohoDao = new ContactZohoDao($this->getZohoClient());
-        $zohoZync= new ZohoDatabaseSyncZoho($this->dbConnection);
+        $zohoZync= new ZohoDatabasePusher($this->dbConnection);
         $tableName = 'zoho_contacts';
         $this->assertTrue($this->dbConnection->getSchemaManager()->tablesExist($tableName));
         // Test insert
@@ -108,6 +109,14 @@ class ZohoDatabaseSyncZohoTest extends \PHPUnit_Framework_TestCase
         $resultDelete= $statementTestDelete->execute()->fetchAll();
         $this->assertNotFalse($resultDelete);
         $zohoZync->pushDeletedRows($contactZohoDao);
+        try{
+            $recordSearch = $contactZohoDao->getById($resultContactInserted['id']);
+            // It returns an empty array when it found nothing.
+            $isRecordSearch = (empty($recordSearch))?false:true;
+        } catch (ZohoCRMResponseException $ex) {
+            $isRecordSearch = null;
+        }
+        $this->assertFalse($isRecordSearch);
         
     }
 

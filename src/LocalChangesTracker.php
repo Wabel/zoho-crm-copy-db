@@ -111,6 +111,9 @@ class LocalChangesTracker
         $innerCode = '';
 
         foreach ($table->getColumns() as $column) {
+            if (in_array($column->getName(), ['id', 'uid'])) {
+                continue;
+            }
             $columnName = $this->connection->quoteIdentifier($column->getName());
             $innerCode .= sprintf('
                 IF (NEW.%s != OLD.%s) THEN
@@ -125,7 +128,7 @@ class LocalChangesTracker
             CREATE TRIGGER %s AFTER UPDATE ON `%s` 
             FOR EACH ROW
             BEGIN
-              IF (NEW.lastActivityTime = OLD.lastActivityTime) THEN
+              IF (NEW.lastActivityTime <=> OLD.lastActivityTime) THEN
             %s
               END IF;
             END;
