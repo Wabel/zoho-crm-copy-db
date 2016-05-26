@@ -44,7 +44,7 @@ class ZohoSyncDatabaseCommand extends Command
      * @param ZohoDatabaseModelSync $zohoDatabaseModelSync
      * @param ZohoDatabaseCopier    $zohoDatabaseCopier
      * @param ZohoDatabasePusher    $zohoDatabaseSync
-     * @param array                 $zohoDaos              The list of Zoho DAOs to copy
+     * @param AbstractZohoDao[]                 $zohoDaos              The list of Zoho DAOs to copy
      * @param Lock                  $lock                  A lock that can be used to avoid running the same command (copy) twice at the same time
      */
     public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync, array $zohoDaos, Lock $lock = null)
