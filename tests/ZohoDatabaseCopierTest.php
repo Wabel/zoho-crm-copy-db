@@ -4,10 +4,8 @@ namespace Wabel\Zoho\CRM\Copy;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Psr\Log\NullLogger;
 use TestNamespace\Contact;
 use TestNamespace\ContactZohoDao;
-use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 use Wabel\Zoho\CRM\ZohoClient;
 
 class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase

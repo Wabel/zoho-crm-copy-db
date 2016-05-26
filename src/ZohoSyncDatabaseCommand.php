@@ -9,8 +9,6 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 
 class ZohoSyncDatabaseCommand extends Command
@@ -41,15 +39,13 @@ class ZohoSyncDatabaseCommand extends Command
      * @var Lock
      */
     private $lock;
-    
 
     /**
-     *
      * @param ZohoDatabaseModelSync $zohoDatabaseModelSync
-     * @param ZohoDatabaseCopier $zohoDatabaseCopier
-     * @param ZohoDatabasePusher $zohoDatabaseSync
-     * @param array $zohoDaos The list of Zoho DAOs to copy
-     * @param Lock $lock A lock that can be used to avoid running the same command (copy) twice at the same time
+     * @param ZohoDatabaseCopier    $zohoDatabaseCopier
+     * @param ZohoDatabasePusher    $zohoDatabaseSync
+     * @param array                 $zohoDaos              The list of Zoho DAOs to copy
+     * @param Lock                  $lock                  A lock that can be used to avoid running the same command (copy) twice at the same time
      */
     public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync, array $zohoDaos, Lock $lock = null)
     {
@@ -66,10 +62,10 @@ class ZohoSyncDatabaseCommand extends Command
         $this
             ->setName('zoho:sync')
             ->setDescription('Synchronize the Zoho CRM data in a local database.')
-            ->addOption("reset", "r", InputOption::VALUE_NONE, 'Get a fresh copy of Zoho (rather than doing incremental copy)')
-            ->addOption("skip-trigger", "s", InputOption::VALUE_NONE, 'Do not create or update the trigger')
-            ->addOption("fetch-only", "f", InputOption::VALUE_NONE, 'Fetch only the Zoho data in local database')
-            ->addOption("push-only", "p", InputOption::VALUE_NONE, 'Push only the local data to Zoho');
+            ->addOption('reset', 'r', InputOption::VALUE_NONE, 'Get a fresh copy of Zoho (rather than doing incremental copy)')
+            ->addOption('skip-trigger', 's', InputOption::VALUE_NONE, 'Do not create or update the trigger')
+            ->addOption('fetch-only', 'f', InputOption::VALUE_NONE, 'Fetch only the Zoho data in local database')
+            ->addOption('push-only', 'p', InputOption::VALUE_NONE, 'Push only the local data to Zoho');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -83,7 +79,7 @@ class ZohoSyncDatabaseCommand extends Command
             }
 
             $this->syncModel($input, $output);
-            
+
             if (!$input->getOption('push-only')) {
                 $this->fetchDb($input, $output);
             }
@@ -100,9 +96,11 @@ class ZohoSyncDatabaseCommand extends Command
 
     /**
      * Sychronizes the model of the database with Zoho records.
+     *
      * @param OutputInterface $output
      */
-    private function syncModel(InputInterface $input, OutputInterface $output){
+    private function syncModel(InputInterface $input, OutputInterface $output)
+    {
         $this->zohoDatabaseModelSync->setLogger(new ConsoleLogger($output));
 
         $twoWaysSync = !$input->getOption('fetch-only');
@@ -117,11 +115,12 @@ class ZohoSyncDatabaseCommand extends Command
 
     /**
      * Run the fetch Db command.
-     * @param InputInterface $input
+     *
+     * @param InputInterface  $input
      * @param OutputInterface $output
      */
-    private function fetchDb(InputInterface $input, OutputInterface $output){
-
+    private function fetchDb(InputInterface $input, OutputInterface $output)
+    {
         if ($input->getOption('reset')) {
             $incremental = false;
         } else {
@@ -141,9 +140,11 @@ class ZohoSyncDatabaseCommand extends Command
 
     /**
      * Run the push Db command.
+     *
      * @param OutputInterface $output
      */
-    private function pushDb(OutputInterface $output){
+    private function pushDb(OutputInterface $output)
+    {
         $this->zohoDatabaseSync->setLogger(new ConsoleLogger($output));
 
         $output->writeln('Starting synchronize Zoho data into Zoho CRM.');

@@ -6,12 +6,10 @@ use function Stringy\create as s;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 
 /**
- *  ZohoDatabaseHelper : Helper class
- * 
+ *  ZohoDatabaseHelper : Helper class.
  */
 class ZohoDatabaseHelper
 {
-    
     /**
      * Computes the name of the table based on the DAO plural module name.
      *

@@ -4,7 +4,6 @@ namespace Wabel\Zoho\CRM\Copy;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Schema;
-use Doctrine\DBAL\Schema\SchemaDiff;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
@@ -35,7 +34,7 @@ class ZohoDatabaseModelSync
      * ZohoDatabaseCopier constructor.
      *
      * @param Connection $connection
-     * @param string $prefix Prefix for the table name in DB
+     * @param string     $prefix     Prefix for the table name in DB
      */
     public function __construct(Connection $connection, $prefix = 'zoho_', LoggerInterface $logger = null)
     {
@@ -61,8 +60,9 @@ class ZohoDatabaseModelSync
      * Synchronizes the DB model with Zoho.
      *
      * @param AbstractZohoDao $dao
-     * @param bool $twoWaysSync
-     * @param bool $skipCreateTrigger
+     * @param bool            $twoWaysSync
+     * @param bool            $skipCreateTrigger
+     *
      * @throws \Doctrine\DBAL\DBALException
      * @throws \Doctrine\DBAL\Schema\SchemaException
      */
@@ -72,8 +72,8 @@ class ZohoDatabaseModelSync
             $this->localChangesTracker->createTrackingTables();
         }
 
-        $tableName = ZohoDatabaseHelper::getTableName($dao,$this->prefix);
-        $this->logger->info("Synchronizing DB Model for ".$tableName);
+        $tableName = ZohoDatabaseHelper::getTableName($dao, $this->prefix);
+        $this->logger->info('Synchronizing DB Model for '.$tableName);
 
         $schema = new Schema();
         $table = $schema->createTable($tableName);
@@ -176,5 +176,4 @@ class ZohoDatabaseModelSync
             $this->localChangesTracker->createUpdateTrigger($table);
         }
     }
-
 }

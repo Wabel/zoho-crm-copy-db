@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Wabel\Zoho\CRM\Copy;
+
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Table;
 use Psr\Log\LoggerInterface;
@@ -31,28 +31,27 @@ class LocalChangesTracker
         $this->logger = $logger;
     }
 
-
     public function createTrackingTables()
     {
         $schema = new \Doctrine\DBAL\Schema\Schema();
 
-        $localUpdate = $schema->createTable("local_update");
-        $localUpdate->addColumn("table_name", 'string', ['length' => 100]);
-        $localUpdate->addColumn("uid", 'integer');
-        $localUpdate->addColumn("field_name", 'string', ['length' => 100]);
-        $localUpdate->setPrimaryKey(array("table_name", "uid", "field_name"));
+        $localUpdate = $schema->createTable('local_update');
+        $localUpdate->addColumn('table_name', 'string', ['length' => 100]);
+        $localUpdate->addColumn('uid', 'integer');
+        $localUpdate->addColumn('field_name', 'string', ['length' => 100]);
+        $localUpdate->setPrimaryKey(array('table_name', 'uid', 'field_name'));
 
-        $localInsert = $schema->createTable("local_insert");
-        $localInsert->addColumn("table_name", 'string', ['length' => 100]);
-        $localInsert->addColumn("uid", 'integer');
-        $localInsert->setPrimaryKey(array("table_name", "uid"));
+        $localInsert = $schema->createTable('local_insert');
+        $localInsert->addColumn('table_name', 'string', ['length' => 100]);
+        $localInsert->addColumn('uid', 'integer');
+        $localInsert->setPrimaryKey(array('table_name', 'uid'));
 
-        $localDelete = $schema->createTable("local_delete");
-        $localDelete->addColumn("table_name", 'string', ['length' => 100]);
-        $localDelete->addColumn("uid", 'integer');
-        $localDelete->addColumn("id",  'string', ['length' => 100]);
-        $localDelete->setPrimaryKey(array("table_name", "uid"));
-        $localDelete->addUniqueIndex(['id','table_name']);
+        $localDelete = $schema->createTable('local_delete');
+        $localDelete->addColumn('table_name', 'string', ['length' => 100]);
+        $localDelete->addColumn('uid', 'integer');
+        $localDelete->addColumn('id',  'string', ['length' => 100]);
+        $localDelete->setPrimaryKey(array('table_name', 'uid'));
+        $localDelete->addUniqueIndex(['id', 'table_name']);
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
         $dbalTableDiffService->createOrUpdateTable($localUpdate);
@@ -62,7 +61,7 @@ class LocalChangesTracker
 
     public function createInsertTrigger(Table $table)
     {
-        $triggerName = sprintf("TRG_%s_ONINSERT", $table->getName());
+        $triggerName = sprintf('TRG_%s_ONINSERT', $table->getName());
 
         $sql = sprintf('
             DROP TRIGGER IF EXISTS %s;
@@ -79,13 +78,12 @@ class LocalChangesTracker
             
             ', $triggerName, $triggerName, $table->getName(), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()));
 
-
         $this->connection->exec($sql);
     }
 
     public function createDeleteTrigger(Table $table)
     {
-        $triggerName = sprintf("TRG_%s_ONDELETE", $table->getName());
+        $triggerName = sprintf('TRG_%s_ONDELETE', $table->getName());
 
         $sql = sprintf('
             DROP TRIGGER IF EXISTS %s;
@@ -100,13 +98,12 @@ class LocalChangesTracker
             
             ', $triggerName, $triggerName, $table->getName(), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()));
 
-
         $this->connection->exec($sql);
     }
 
     public function createUpdateTrigger(Table $table)
     {
-        $triggerName = sprintf("TRG_%s_ONUPDATE", $table->getName());
+        $triggerName = sprintf('TRG_%s_ONUPDATE', $table->getName());
 
         $innerCode = '';
 
@@ -134,7 +131,6 @@ class LocalChangesTracker
             END;
             
             ', $triggerName, $triggerName, $table->getName(), $innerCode);
-
 
         $this->connection->exec($sql);
     }

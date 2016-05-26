@@ -1,4 +1,5 @@
 <?php
+
 namespace Wabel\Zoho\CRM\Copy;
 
 use Symfony\Component\Console\Application;
@@ -22,7 +23,6 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
     {
         $contactZohoDao = new ContactZohoDao($this->getZohoClient());
 
-
         $syncModel = $this->prophesize(ZohoDatabaseModelSync::class);
         $syncModel->setLogger(Argument::type(ConsoleLogger::class))->shouldBeCalled();
         $syncModel->synchronizeDbModel(Argument::type(ContactZohoDao::class), true, false)->shouldBeCalled();
@@ -37,13 +37,12 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
 
         $application = new Application();
         $application->add(new ZohoSyncDatabaseCommand($syncModel->reveal(), $dbCopier->reveal(), $pusher->reveal(), [
-            $contactZohoDao
+            $contactZohoDao,
         ]));
 
         $command = $application->find('zoho:sync');
         $commandTester = new CommandTester($command);
         $commandTester->execute(array('command' => $command->getName()));
-
     }
 
     /**
@@ -59,12 +58,12 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
 
         $application = new Application();
         $application->add(new ZohoSyncDatabaseCommand($syncModel->reveal(), $dbCopier->reveal(), $pusher->reveal(), [
-            $contactZohoDao
+            $contactZohoDao,
         ]));
 
         $command = $application->find('zoho:sync');
         $commandTester = new CommandTester($command);
-        $commandTester->execute(array('command' => $command->getName(), '--fetch-only'=>true, '--push-only'=>true));
+        $commandTester->execute(array('command' => $command->getName(), '--fetch-only' => true, '--push-only' => true));
 
         $this->assertRegExp('/Options fetch-only and push-only are mutually exclusive/', $commandTester->getDisplay());
     }

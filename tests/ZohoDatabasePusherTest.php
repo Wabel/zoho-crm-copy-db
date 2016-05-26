@@ -4,10 +4,7 @@ namespace Wabel\Zoho\CRM\Copy;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Psr\Log\NullLogger;
-use TestNamespace\Contact;
 use TestNamespace\ContactZohoDao;
-use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 use Wabel\Zoho\CRM\ZohoClient;
 use Wabel\Zoho\CRM\Exception\ZohoCRMResponseException;
 
@@ -17,7 +14,6 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
      * @var Connection
      */
     protected $dbConnection;
-
 
     protected function setUp()
     {
@@ -44,14 +40,14 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
     public function testSync()
     {
         $contactZohoDao = new ContactZohoDao($this->getZohoClient());
-        $zohoZync= new ZohoDatabasePusher($this->dbConnection);
+        $zohoZync = new ZohoDatabasePusher($this->dbConnection);
         $tableName = 'zoho_contacts';
         $this->assertTrue($this->dbConnection->getSchemaManager()->tablesExist($tableName));
         // Test insert
         $data = [
             'firstName' => 'TestZohoSync',
             'lastName' => uniqid('Test'),
-            'dateOfBirth' => date('Y-m-d')
+            'dateOfBirth' => date('Y-m-d'),
         ];
         $data['email'] = $data['lastName'].'@test.com';
         $this->dbConnection->insert($tableName, $data);
@@ -61,7 +57,7 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
         ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
         ->where('l.table_name=:table_name')
         ->setParameters([
-            'table_name' => $tableName
+            'table_name' => $tableName,
         ]);
         $resultInsertion = $statementTestInsert->execute()->fetchAll();
         $this->assertNotFalse($resultInsertion);
@@ -69,7 +65,7 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
         $resultContactInserted = $this->dbConnection->fetchAssoc('SELECT * FROM '.$tableName.' WHERE uid = :uid', ['uid' => $resultInsertion[0]['uid']]);
         $this->assertNotFalse($resultContactInserted);
         $this->assertNotNull($resultContactInserted['id']);
-        
+
         //Test update
         $dataUpdate = [
             'firstName' => 'TestZohoSyncUpdated',
@@ -84,7 +80,7 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
         ->andWhere('l.uid = :uid')
         ->setParameters([
             'table_name' => $tableName,
-            'uid' => $resultInsertion[0]['uid']
+            'uid' => $resultInsertion[0]['uid'],
         ]);
         $resultUpdate = $statementTestUpdate->execute()->fetchAll();
         $this->assertNotFalse($resultUpdate);
@@ -92,7 +88,7 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
         $zohoZync->pushUpdatedRows($contactZohoDao);
         sleep(60);
         $contactZohoUpdate = $contactZohoDao->getById($resultContactInserted['id']);
-        $this->assertEquals($dataUpdate['firstName'],$contactZohoUpdate->getFirstName());
+        $this->assertEquals($dataUpdate['firstName'], $contactZohoUpdate->getFirstName());
         $this->assertEquals($dataUpdate['lastName'], $contactZohoUpdate->getLastName());
 
         // Delete
@@ -104,20 +100,19 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
         ->andWhere('l.id = :id')
         ->setParameters([
             'table_name' => $tableName,
-            'id' => $resultContactInserted['id']
+            'id' => $resultContactInserted['id'],
         ]);
-        $resultDelete= $statementTestDelete->execute()->fetchAll();
+        $resultDelete = $statementTestDelete->execute()->fetchAll();
         $this->assertNotFalse($resultDelete);
         $zohoZync->pushDeletedRows($contactZohoDao);
-        try{
+        try {
             $recordSearch = $contactZohoDao->getById($resultContactInserted['id']);
             // It returns an empty array when it found nothing.
-            $isRecordSearch = (empty($recordSearch))?false:true;
+            $isRecordSearch = (empty($recordSearch)) ? false : true;
         } catch (ZohoCRMResponseException $ex) {
             $isRecordSearch = null;
         }
         $this->assertFalse($isRecordSearch);
-        
     }
 
     protected function tearDown()
