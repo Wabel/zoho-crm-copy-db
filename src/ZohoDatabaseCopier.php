@@ -3,12 +3,9 @@
 namespace Wabel\Zoho\CRM\Copy;
 
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\Schema\Schema;
-use Doctrine\DBAL\Schema\SchemaDiff;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
-use function Stringy\create as s;
 
 /**
  * This class is in charge of synchronizing one table of your database with Zoho records.
@@ -40,9 +37,9 @@ class ZohoDatabaseCopier
     /**
      * ZohoDatabaseCopier constructor.
      *
-     * @param Connection $connection
-     * @param string $prefix Prefix for the table name in DB
-     * @param ZohoChangeListener[] $listeners The list of listeners called when a record is inserted or updated.
+     * @param Connection           $connection
+     * @param string               $prefix     Prefix for the table name in DB
+     * @param ZohoChangeListener[] $listeners  The list of listeners called when a record is inserted or updated.
      */
     public function __construct(Connection $connection, $prefix = 'zoho_', array $listeners = [], LoggerInterface $logger = null)
     {
@@ -65,136 +62,6 @@ class ZohoDatabaseCopier
         $this->logger = $logger;
     }
 
-
-    /**
-     * @param AbstractZohoDao $dao
-     * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
-     */
-    public function copy(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true)
-    {
-        if ($twoWaysSync === true) {
-            $this->localChangesTracker->createTrackingTables();
-        }
-        $this->synchronizeDbModel($dao, $twoWaysSync);
-        $this->copyData($dao, $incrementalSync, $twoWaysSync);
-        // TODO: we need to track DELETED records in Zoho!
-    }
-
-    /**
-     * Synchronizes the DB model with Zoho.
-     *
-     * @param AbstractZohoDao $dao
-     * @param bool $twoWaysSync
-     * @throws \Doctrine\DBAL\DBALException
-     * @throws \Doctrine\DBAL\Schema\SchemaException
-     */
-    private function synchronizeDbModel(AbstractZohoDao $dao, $twoWaysSync)
-    {
-        $tableName = $this->getTableName($dao);
-        $this->logger->info("Synchronizing DB Model for ".$tableName);
-
-        $schema = new Schema();
-        $table = $schema->createTable($tableName);
-
-        $flatFields = $this->getFlatFields($dao->getFields());
-
-        $table->addColumn('id', 'string', ['length' => 100]);
-        $table->setPrimaryKey(['id']);
-
-        foreach ($flatFields as $field) {
-            $columnName = $field['name'];
-
-            $length = null;
-            $index = false;
-
-            // Note: full list of types available here: https://www.zoho.com/crm/help/customization/custom-fields.html
-            switch ($field['type']) {
-                case 'Lookup ID':
-                case 'Lookup':
-                    $type = 'string';
-                    $length = 100;
-                    $index = true;
-                    break;
-                case 'OwnerLookup':
-                    $type = 'string';
-                    $index = true;
-                    $length = 25;
-                    break;
-                case 'Formula':
-                    // Note: a Formula can return any type, but we have no way to know which type it returns...
-                    $type = 'string';
-                    $length = 100;
-                    break;
-                case 'DateTime':
-                    $type = 'datetime';
-                    break;
-                case 'Date':
-                    $type = 'date';
-                    break;
-                case 'DateTime':
-                    $type = 'datetime';
-                    break;
-                case 'Boolean':
-                    $type = 'boolean';
-                    break;
-                case 'TextArea':
-                    $type = 'text';
-                    break;
-                case 'BigInt':
-                    $type = 'bigint';
-                    break;
-                case 'Phone':
-                case 'Auto Number':
-                case 'Text':
-                case 'URL':
-                case 'Email':
-                case 'Website':
-                case 'Pick List':
-                case 'Multiselect Pick List':
-                    $type = 'string';
-                    $length = $field['maxlength'];
-                    break;
-                case 'Double':
-                case 'Percent':
-                    $type = 'float';
-                    break;
-                case 'Integer':
-                    $type = 'integer';
-                    break;
-                case 'Currency':
-                case 'Decimal':
-                    $type = 'decimal';
-                    break;
-                default:
-                    throw new \RuntimeException('Unknown type "'.$field['type'].'"');
-            }
-
-            $options = [];
-
-            if ($length) {
-                $options['length'] = $length;
-            }
-
-            //$options['notnull'] = $field['req'];
-            $options['notnull'] = false;
-
-            $table->addColumn($columnName, $type, $options);
-
-            if ($index) {
-                $table->addIndex([$columnName]);
-            }
-        }
-
-        $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
-        $hasChanges = $dbalTableDiffService->createOrUpdateTable($table);
-
-        if ($twoWaysSync && $hasChanges) {
-            $this->localChangesTracker->createInsertTrigger($table);
-            $this->localChangesTracker->createDeleteTrigger($table);
-            $this->localChangesTracker->createUpdateTrigger($table);
-        }
-    }
-
     /**
      * @param AbstractZohoDao $dao
      * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
@@ -204,9 +71,9 @@ class ZohoDatabaseCopier
      * @throws \Doctrine\DBAL\Schema\SchemaException
      * @throws \Wabel\Zoho\CRM\Exception\ZohoCRMResponseException
      */
-    private function copyData(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true)
+    public function fetchFromZoho(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true)
     {
-        $tableName = $this->getTableName($dao);
+        $tableName = ZohoDatabaseHelper::getTableName($dao, $this->prefix);
 
         if ($incrementalSync) {
             $this->logger->info("Copying incremental data for '$tableName'");
@@ -214,9 +81,9 @@ class ZohoDatabaseCopier
             $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(lastActivityTime) FROM '.$tableName);
             if ($lastActivityTime !== null) {
                 $lastActivityTime = new \DateTime($lastActivityTime);
-                $this->logger->info("Last activity time: ".$lastActivityTime->format('c'));
+                $this->logger->info('Last activity time: '.$lastActivityTime->format('c'));
                 // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
-                $lastActivityTime->add(new \DateInterval("PT1S"));
+                $lastActivityTime->add(new \DateInterval('PT1S'));
             }
 
             $records = $dao->getRecords(null, null, $lastActivityTime);
@@ -226,11 +93,11 @@ class ZohoDatabaseCopier
             $records = $dao->getRecords();
             $deletedRecordIds = [];
         }
-        $this->logger->info("Fetched ".count($records)." records");
+        $this->logger->info('Fetched '.count($records).' records');
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
 
-        $flatFields = $this->getFlatFields($dao->getFields());
+        $flatFields = ZohoDatabaseHelper::getFlatFields($dao->getFields());
         $fieldsByName = [];
         foreach ($flatFields as $field) {
             $fieldsByName[$field['name']] = $field;
@@ -244,7 +111,7 @@ class ZohoDatabaseCopier
             $data = [];
             $types = [];
             foreach ($table->getColumns() as $column) {
-                if ($column->getName() === 'id') {
+                if (in_array($column->getName(), ['id', 'uid'])) {
                     continue;
                 } else {
                     $field = $fieldsByName[$column->getName()];
@@ -281,42 +148,18 @@ class ZohoDatabaseCopier
                 }
             }
         }
-
+        $sqlStatementUid = 'select uid from '.$this->connection->quoteIdentifier($tableName).' where id = :id';
         foreach ($deletedRecordIds as $id) {
-            $this->connection->delete($tableName, [ 'id' => $id ]);
+            $uid = $this->connection->fetchColumn($sqlStatementUid, ['id' => $id]);
+            $this->connection->delete($tableName, ['id' => $id]);
             if ($twoWaysSync) {
                 // TODO: we could detect if there are changes to be updated to the server and try to warn with a log message
                 // Also, let's remove the newly created field (because of the trigger) to avoid looping back to Zoho
-                $this->connection->delete('local_delete', [ 'table_name' => $tableName, 'id' => $id ]);
-                $this->connection->delete('local_update', [ 'table_name' => $tableName, 'id' => $id ]);
+                $this->connection->delete('local_delete', ['table_name' => $tableName, 'id' => $id]);
+                $this->connection->delete('local_update', ['table_name' => $tableName, 'uid' => $uid]);
             }
         }
 
         $this->connection->commit();
-    }
-
-    private function getFlatFields(array $fields)
-    {
-        $flatFields = [];
-        foreach ($fields as $cat) {
-            $flatFields = array_merge($flatFields, $cat);
-        }
-
-        return $flatFields;
-    }
-
-    /**
-     * Computes the name of the table based on the DAO plural module name.
-     *
-     * @param AbstractZohoDao $dao
-     *
-     * @return string
-     */
-    private function getTableName(AbstractZohoDao $dao)
-    {
-        $tableName = $this->prefix.$dao->getPluralModuleName();
-        $tableName = s($tableName)->upperCamelize()->underscored();
-
-        return (string) $tableName;
     }
 }

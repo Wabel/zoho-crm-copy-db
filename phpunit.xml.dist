@@ -25,7 +25,10 @@
 
     <testsuites>
         <testsuite name="ZohoCRM Copy DB test suite">
-            <directory>./tests/</directory>
+            <file>./tests/ZohoDatabaseModelSyncTest.php</file>
+            <file>./tests/ZohoSyncDatabaseCommandTest.php</file>
+            <file>./tests/ZohoDatabaseCopierTest.php</file>
+            <file>./tests/ZohoDatabasePusherTest.php</file>
         </testsuite>
     </testsuites>
     <filter>

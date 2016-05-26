@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Wabel\Zoho\CRM\Copy;
-
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Comparator;
@@ -33,6 +31,7 @@ class DbalTableDiffService
 
     /**
      * @param Table $table
+     *
      * @return bool Returns true if changes where applied. False otherwise.
      */
     public function createOrUpdateTable(Table $table)
@@ -46,7 +45,7 @@ class DbalTableDiffService
             $tableDiff = $comparator->diffTable($dbTable, $table);
 
             if ($tableDiff !== false) {
-                $this->logger->notice("Changes detected in table structure for ".$tableName.". Applying patch.");
+                $this->logger->notice('Changes detected in table structure for '.$tableName.'. Applying patch.');
                 $diff = new SchemaDiff();
                 $diff->fromSchema = $dbSchema;
                 $diff->changedTables[$tableName] = $tableDiff;
@@ -54,9 +53,11 @@ class DbalTableDiffService
                 foreach ($statements as $sql) {
                     $this->connection->exec($sql);
                 }
+
                 return true;
             } else {
-                $this->logger->info("No changes detected in table structure for ".$tableName);
+                $this->logger->info('No changes detected in table structure for '.$tableName);
+
                 return false;
             }
         } else {
@@ -68,6 +69,7 @@ class DbalTableDiffService
             foreach ($statements as $sql) {
                 $this->connection->exec($sql);
             }
+
             return true;
         }
     }
