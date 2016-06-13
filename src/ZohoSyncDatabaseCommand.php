@@ -10,6 +10,7 @@ use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Wabel\Zoho\CRM\AbstractZohoDao;
+use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 
 class ZohoSyncDatabaseCommand extends Command
 {
@@ -41,19 +42,27 @@ class ZohoSyncDatabaseCommand extends Command
     private $lock;
 
     /**
+     * The Zoho Dao and Beans generator
+     * @var EntitiesGeneratorService
+     */
+    private $zohoEntitiesGenerator;
+
+
+    /**
      * @param ZohoDatabaseModelSync $zohoDatabaseModelSync
      * @param ZohoDatabaseCopier    $zohoDatabaseCopier
      * @param ZohoDatabasePusher    $zohoDatabaseSync
+     * @param EntitiesGeneratorService $zohoEntitiesGenerator The Zoho Dao and Beans generator
      * @param AbstractZohoDao[]                 $zohoDaos              The list of Zoho DAOs to copy
      * @param Lock                  $lock                  A lock that can be used to avoid running the same command (copy) twice at the same time
      */
-    public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync, array $zohoDaos, Lock $lock = null)
+    public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync, EntitiesGeneratorService $zohoEntitiesGenerator, Lock $lock = null)
     {
         parent::__construct();
         $this->zohoDatabaseModelSync = $zohoDatabaseModelSync;
         $this->zohoDatabaseCopier = $zohoDatabaseCopier;
         $this->zohoDatabaseSync = $zohoDatabaseSync;
-        $this->zohoDaos = $zohoDaos;
+        $this->zohoEntitiesGenerator =  $zohoEntitiesGenerator;
         $this->lock = $lock;
     }
 
@@ -74,10 +83,14 @@ class ZohoSyncDatabaseCommand extends Command
             if ($this->lock) {
                 $this->lock->acquireLock();
             }
+            
+            
             if ($input->getOption('fetch-only') && $input->getOption('push-only')) {
                 $output->writeln('<error>Options fetch-only and push-only are mutually exclusive.</error>');
             }
 
+            $this->regenerateZohoDao($input, $output);
+            
             $this->syncModel($input, $output);
 
             if (!$input->getOption('push-only')) {
@@ -113,6 +126,33 @@ class ZohoSyncDatabaseCommand extends Command
         $output->writeln('Zoho data successfully synchronized.');
     }
 
+
+    /**
+     * Regerate Zoho Daos
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     */
+    private function regenerateZohoDao(InputInterface $input, OutputInterface $output)
+    {
+        try {
+            $logger = new ConsoleLogger($output);
+            $zohoModules = $this->zohoEntitiesGenerator->generateAll(ROOT_PATH.'src/Utils/Zoho/CRM/', 'Wabel\\Utils\\Zoho\\CRM');
+
+            foreach ($zohoModules as $zohoModule) {
+                $fullDaoClassName = $zohoModule['fullDaoClassName'];
+                $zohoDao = new $fullDaoClassName($this->zohoEntitiesGenerator->getZohoClient());
+                $this->zohoDaos [] = $zohoDao;
+                $output->writeln(sprintf('<info>%s has created</info>', get_class($zohoDao)));
+            }
+            $logger->info("Success to create all the zoho daos.");
+        }
+        catch(\Exception $e) {
+            $logger->error("Fail :".$e->getMessage());
+        }
+
+    }
+    
+    
     /**
      * Run the fetch Db command.
      *
