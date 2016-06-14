@@ -47,22 +47,30 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private $zohoEntitiesGenerator;
 
+    private $pathZohoDaos;
+
+    private $namespaceZohoDaos;
+
 
     /**
      * @param ZohoDatabaseModelSync $zohoDatabaseModelSync
      * @param ZohoDatabaseCopier    $zohoDatabaseCopier
      * @param ZohoDatabasePusher    $zohoDatabaseSync
      * @param EntitiesGeneratorService $zohoEntitiesGenerator The Zoho Dao and Beans generator
-     * @param AbstractZohoDao[]                 $zohoDaos              The list of Zoho DAOs to copy
+     * @param string $pathZohoDaos Tht path where we need to generate the Daos.
+     * @param string $namespaceZohoDaos Daos namespace
      * @param Lock                  $lock                  A lock that can be used to avoid running the same command (copy) twice at the same time
      */
-    public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync, EntitiesGeneratorService $zohoEntitiesGenerator, Lock $lock = null)
+    public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync, EntitiesGeneratorService $zohoEntitiesGenerator,
+        $pathZohoDaos, $namespaceZohoDaos, Lock $lock = null)
     {
         parent::__construct();
         $this->zohoDatabaseModelSync = $zohoDatabaseModelSync;
         $this->zohoDatabaseCopier = $zohoDatabaseCopier;
         $this->zohoDatabaseSync = $zohoDatabaseSync;
         $this->zohoEntitiesGenerator =  $zohoEntitiesGenerator;
+        $this->pathZohoDaos = $pathZohoDaos;
+        $this->namespaceZohoDaos = $namespaceZohoDaos;
         $this->lock = $lock;
     }
 
@@ -136,7 +144,7 @@ class ZohoSyncDatabaseCommand extends Command
     {
         try {
             $logger = new ConsoleLogger($output);
-            $zohoModules = $this->zohoEntitiesGenerator->generateAll(ROOT_PATH.'src/Utils/Zoho/CRM/', 'Wabel\\Utils\\Zoho\\CRM');
+            $zohoModules = $this->zohoEntitiesGenerator->generateAll($this->pathZohoDaos,$this->namespaceZohoDaos);
 
             foreach ($zohoModules as $zohoModule) {
                 $fullDaoClassName = $zohoModule['fullDaoClassName'];
