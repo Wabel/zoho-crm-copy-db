@@ -107,7 +107,7 @@ class ZohoSyncDatabaseCommand extends Command
                 $output->writeln('<error>Options fetch-only and push-only are mutually exclusive.</error>');
             }
 
-            $this->regenerateZohoDao($input, $output);
+            $this->regenerateZohoDao($output);
             
             $this->syncModel($input, $output);
 
@@ -150,7 +150,7 @@ class ZohoSyncDatabaseCommand extends Command
      * @param InputInterface $input
      * @param OutputInterface $output
      */
-    private function regenerateZohoDao(InputInterface $input, OutputInterface $output)
+    private function regenerateZohoDao(OutputInterface $output)
     {
         $logger = new ConsoleLogger($output);
         $zohoModules = $this->zohoEntitiesGenerator->generateAll($this->pathZohoDaos,$this->namespaceZohoDaos);
