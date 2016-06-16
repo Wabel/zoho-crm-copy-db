@@ -11,6 +11,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
+use Wabel\Zoho\CRM\ZohoClient;
 
 class ZohoSyncDatabaseCommand extends Command
 {
@@ -47,6 +48,12 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private $zohoEntitiesGenerator;
 
+    /**
+     *
+     * @var ZohoClient
+     */
+    private $zohoClient;
+
     private $pathZohoDaos;
 
     private $namespaceZohoDaos;
@@ -57,11 +64,13 @@ class ZohoSyncDatabaseCommand extends Command
      * @param ZohoDatabaseCopier    $zohoDatabaseCopier
      * @param ZohoDatabasePusher    $zohoDatabaseSync
      * @param EntitiesGeneratorService $zohoEntitiesGenerator The Zoho Dao and Beans generator
+     * @param ZohoClient $zohoClient
      * @param string $pathZohoDaos Tht path where we need to generate the Daos.
      * @param string $namespaceZohoDaos Daos namespace
      * @param Lock                  $lock                  A lock that can be used to avoid running the same command (copy) twice at the same time
      */
-    public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync, EntitiesGeneratorService $zohoEntitiesGenerator,
+    public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync,
+        EntitiesGeneratorService $zohoEntitiesGenerator, ZohoClient $zohoClient,
         $pathZohoDaos, $namespaceZohoDaos, Lock $lock = null)
     {
         parent::__construct();
@@ -69,6 +78,7 @@ class ZohoSyncDatabaseCommand extends Command
         $this->zohoDatabaseCopier = $zohoDatabaseCopier;
         $this->zohoDatabaseSync = $zohoDatabaseSync;
         $this->zohoEntitiesGenerator =  $zohoEntitiesGenerator;
+        $this->zohoClient = $zohoClient;
         $this->pathZohoDaos = $pathZohoDaos;
         $this->namespaceZohoDaos = $namespaceZohoDaos;
         $this->lock = $lock;
@@ -142,22 +152,14 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function regenerateZohoDao(InputInterface $input, OutputInterface $output)
     {
-        try {
-            $logger = new ConsoleLogger($output);
-            $zohoModules = $this->zohoEntitiesGenerator->generateAll($this->pathZohoDaos,$this->namespaceZohoDaos);
-
-            foreach ($zohoModules as $zohoModule) {
-                $fullDaoClassName = $zohoModule['fullDaoClassName'];
-                $zohoDao = new $fullDaoClassName($this->zohoEntitiesGenerator->getZohoClient());
-                $this->zohoDaos [] = $zohoDao;
-                $output->writeln(sprintf('<info>%s has created</info>', get_class($zohoDao)));
-            }
-            $logger->info("Success to create all the zoho daos.");
+        $logger = new ConsoleLogger($output);
+        $zohoModules = $this->zohoEntitiesGenerator->generateAll($this->pathZohoDaos,$this->namespaceZohoDaos);
+        foreach ($zohoModules as $daoFullClassName) {
+            $zohoDao = new $daoFullClassName($this->zohoClient);
+            $this->zohoDaos [] = $zohoDao;
+            $logger->info(sprintf('<info>%s has created</info>', get_class($zohoDao)));
         }
-        catch(\Exception $e) {
-            $logger->error("Fail :".$e->getMessage());
-        }
-
+        $logger->info("Success to create all the zoho daos.");
     }
     
     

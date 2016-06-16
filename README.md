@@ -72,7 +72,8 @@ Symfony command
 
 The project also comes with a Symfony Command that you can use to easily copy tables.
 
-The command's constructor takes in parameter a `ZohoDatabaseCopier` instance, a`ZohoDatabasePusher` instance and a list of `ZohoDAOs`.
+The command's constructor takes in parameter a `ZohoDatabaseCopier` instance, a`ZohoDatabasePusher` instance and a `ZohoClient`. This command
+regenerates automatically the Daos in order to pass them in `ZohoDatabaseCopier` instance, a`ZohoDatabasePusher`.
 
 Usage:
 

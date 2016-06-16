@@ -62,7 +62,7 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
         
         $application = new Application();
         $application->add(new ZohoSyncDatabaseCommand($syncModel->reveal(), $dbCopier->reveal(), $pusher->reveal(),
-            $generator, __DIR__.'/generated/','TestNamespace'));
+            $generator,$this->getZohoClient(), __DIR__.'/generated/','TestNamespace'));
         
         $command = $application->find('zoho:sync');
         $commandTester = new CommandTester($command);
@@ -82,7 +82,7 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
 
         $application = new Application();
         $application->add(new ZohoSyncDatabaseCommand($syncModel->reveal(), $dbCopier->reveal(), $pusher->reveal(),
-            $generator, __DIR__.'/generated/','TestNamespace'));
+            $generator,$this->getZohoClient(), __DIR__.'/generated/','TestNamespace'));
 
         $command = $application->find('zoho:sync');
         $commandTester = new CommandTester($command);
