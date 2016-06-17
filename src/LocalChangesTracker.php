@@ -113,7 +113,7 @@ class LocalChangesTracker
             }
             $columnName = $this->connection->quoteIdentifier($column->getName());
             $innerCode .= sprintf('
-                IF (NEW.%s != OLD.%s) THEN
+                IF NOT(NEW.%s <=> OLD.%s) THEN
                   REPLACE INTO local_update VALUES (%s, NEW.uid, %s);
                 END IF;
             ', $columnName, $columnName, $this->connection->quote($table->getName()), $this->connection->quote($column->getName()));
