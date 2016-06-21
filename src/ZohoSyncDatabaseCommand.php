@@ -110,10 +110,10 @@ class ZohoSyncDatabaseCommand extends Command
             $this->regenerateZohoDao($output);
             
             $this->syncModel($input, $output);
-//
-//            if (!$input->getOption('push-only')) {
-//                $this->fetchDb($input, $output);
-//            }
+
+            if (!$input->getOption('push-only')) {
+                $this->fetchDb($input, $output);
+            }
             if (!$input->getOption('fetch-only')) {
                 $this->pushDb($output);
             }
