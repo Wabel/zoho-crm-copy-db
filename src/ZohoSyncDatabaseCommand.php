@@ -110,10 +110,10 @@ class ZohoSyncDatabaseCommand extends Command
             $this->regenerateZohoDao($output);
             
             $this->syncModel($input, $output);
-
-            if (!$input->getOption('push-only')) {
-                $this->fetchDb($input, $output);
-            }
+//
+//            if (!$input->getOption('push-only')) {
+//                $this->fetchDb($input, $output);
+//            }
             if (!$input->getOption('fetch-only')) {
                 $this->pushDb($output);
             }
@@ -152,14 +152,14 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function regenerateZohoDao(OutputInterface $output)
     {
-        $logger = new ConsoleLogger($output);
+        $output->writeln("Start to generate all the zoho daos.");
         $zohoModules = $this->zohoEntitiesGenerator->generateAll($this->pathZohoDaos,$this->namespaceZohoDaos);
         foreach ($zohoModules as $daoFullClassName) {
             $zohoDao = new $daoFullClassName($this->zohoClient);
             $this->zohoDaos [] = $zohoDao;
-            $logger->info(sprintf('<info>%s has created</info>', get_class($zohoDao)));
+            $output->writeln(sprintf('<info>%s has created</info>', get_class($zohoDao)));
         }
-        $logger->info("Success to create all the zoho daos.");
+        $output->writeln("Success to create all the zoho daos.");
     }
     
     
