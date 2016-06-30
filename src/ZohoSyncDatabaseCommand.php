@@ -12,6 +12,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 use Wabel\Zoho\CRM\ZohoClient;
+use Logger\Formatters\DateTimeFormatter;
+use Mouf\Utils\Log\Psr\MultiLogger;
 
 class ZohoSyncDatabaseCommand extends Command
 {
@@ -36,6 +38,12 @@ class ZohoSyncDatabaseCommand extends Command
      * @var ZohoDatabasePusher
      */
     private $zohoDatabaseSync;
+
+    /**
+     *
+     * @var MultiLogger
+     */
+    private $logger;
 
     /**
      * @var Lock
@@ -67,11 +75,12 @@ class ZohoSyncDatabaseCommand extends Command
      * @param ZohoClient $zohoClient
      * @param string $pathZohoDaos Tht path where we need to generate the Daos.
      * @param string $namespaceZohoDaos Daos namespace
+     * @param MultiLogger $logger
      * @param Lock                  $lock                  A lock that can be used to avoid running the same command (copy) twice at the same time
      */
     public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync,
         EntitiesGeneratorService $zohoEntitiesGenerator, ZohoClient $zohoClient,
-        $pathZohoDaos, $namespaceZohoDaos, Lock $lock = null)
+        $pathZohoDaos, $namespaceZohoDaos, MultiLogger $logger, Lock $lock = null)
     {
         parent::__construct();
         $this->zohoDatabaseModelSync = $zohoDatabaseModelSync;
@@ -81,6 +90,7 @@ class ZohoSyncDatabaseCommand extends Command
         $this->zohoClient = $zohoClient;
         $this->pathZohoDaos = $pathZohoDaos;
         $this->namespaceZohoDaos = $namespaceZohoDaos;
+        $this->logger = $logger;
         $this->lock = $lock;
     }
 
@@ -102,7 +112,7 @@ class ZohoSyncDatabaseCommand extends Command
                 $this->lock->acquireLock();
             }
             
-            
+            $this->logger->addLogger(new DateTimeFormatter(new ConsoleLogger($output)));
             if ($input->getOption('fetch-only') && $input->getOption('push-only')) {
                 $output->writeln('<error>Options fetch-only and push-only are mutually exclusive.</error>');
             }
@@ -132,8 +142,6 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function syncModel(InputInterface $input, OutputInterface $output)
     {
-        $this->zohoDatabaseModelSync->setLogger(new ConsoleLogger($output));
-
         $twoWaysSync = !$input->getOption('fetch-only');
         $skipCreateTrigger = $input->getOption('skip-trigger');
 
@@ -144,7 +152,23 @@ class ZohoSyncDatabaseCommand extends Command
         $output->writeln('Zoho data successfully synchronized.');
     }
 
+    /**
+     * @param AbstractZohoDao $zohoDao
+     *
+     * @return array
+     */
+    private function getListFieldName(AbstractZohoDao $zohoDao)
+    {
+        $fieldNames= array();
+        foreach ($zohoDao->getFields() as $fieldsDescriptor) {
+            foreach (array_values($fieldsDescriptor) as $fieldDescriptor) {
+                $fieldNames[] = $fieldDescriptor['name'];
+            }
+        }
 
+        return $fieldNames;
+    }
+    
     /**
      * Regerate Zoho Daos
      * @param InputInterface $input
@@ -155,7 +179,11 @@ class ZohoSyncDatabaseCommand extends Command
         $output->writeln("Start to generate all the zoho daos.");
         $zohoModules = $this->zohoEntitiesGenerator->generateAll($this->pathZohoDaos,$this->namespaceZohoDaos);
         foreach ($zohoModules as $daoFullClassName) {
+            /* @var $zohoDao AbstractZohoDao */
             $zohoDao = new $daoFullClassName($this->zohoClient);
+            if(!in_array('lastActivityTime', $this->getListFieldName($zohoDao))){
+                continue;
+            }
             $this->zohoDaos [] = $zohoDao;
             $output->writeln(sprintf('<info>%s has created</info>', get_class($zohoDao)));
         }
@@ -178,7 +206,6 @@ class ZohoSyncDatabaseCommand extends Command
         }
 
         $twoWaysSync = !$input->getOption('fetch-only');
-        $this->zohoDatabaseCopier->setLogger(new ConsoleLogger($output));
 
         $output->writeln('Starting copying Zoho data into local database.');
         foreach ($this->zohoDaos as $zohoDao) {
@@ -195,7 +222,6 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function pushDb(OutputInterface $output)
     {
-        $this->zohoDatabaseSync->setLogger(new ConsoleLogger($output));
 
         $output->writeln('Starting synchronize Zoho data into Zoho CRM.');
         foreach ($this->zohoDaos as $zohoDao) {
