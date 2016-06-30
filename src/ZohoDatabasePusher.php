@@ -116,17 +116,21 @@ class ZohoDatabasePusher
         $zohoDao->save($zohoBeans);
         if (!$update) {
             foreach ($zohoBeans as $uid => $zohoBean) {
+                $this->connection->beginTransaction();
                 $this->connection->update($tableName, ['id' => $zohoBean->getZohoId()], ['uid' => $uid]);
+                $this->connection->delete('local_insert', [ 'uid' => $uid ]);
+                $this->connection->commit();
             }
+        } else {
+            $this->connection->executeUpdate('delete from local_update where uid in ( :rowsDeleted)',
+                [
+                'rowsDeleted' => $rowsDeleted,
+                ],
+                [
+                'rowsDeleted' => Connection::PARAM_INT_ARRAY,
+                ]
+            );
         }
-        $this->connection->executeUpdate('delete from '.$localTable.' where uid in ( :rowsDeleted)',
-            [
-            'rowsDeleted' => $rowsDeleted,
-            ],
-            [
-            'rowsDeleted' => Connection::PARAM_INT_ARRAY,
-            ]
-        );
     }
 
     /**
@@ -243,12 +247,5 @@ class ZohoDatabasePusher
         $this->logger->info(' > Delete rows using  {class_name}', ['class_name' => get_class($zohoDao)]);
         $this->pushDeletedRows($zohoDao);
     }
-
-    /**
-     * @param LoggerInterface $logger
-     */
-    public function setLogger(LoggerInterface $logger)
-    {
-        $this->logger = $logger;
-    }
+    
 }

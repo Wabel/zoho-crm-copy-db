@@ -49,20 +49,18 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
         $this->loadFilesZohoDaos($generator);
 
         $syncModel = $this->prophesize(ZohoDatabaseModelSync::class);
-        $syncModel->setLogger(Argument::type(ConsoleLogger::class))->shouldBeCalled();
         $syncModel->synchronizeDbModel(Argument::type(AbstractZohoDao::class), true, false)->shouldBeCalled();
 
         $dbCopier = $this->prophesize(ZohoDatabaseCopier::class);
-        $dbCopier->setLogger(Argument::type(ConsoleLogger::class))->shouldBeCalled();
         $dbCopier->fetchFromZoho(Argument::type(AbstractZohoDao::class), true, true)->shouldBeCalled();
 
         $pusher = $this->prophesize(ZohoDatabasePusher::class);
-        $pusher->setLogger(Argument::type(ConsoleLogger::class))->shouldBeCalled();
         $pusher->pushToZoho(Argument::type(AbstractZohoDao::class))->shouldBeCalled();
-        
+
+        $logger = new \Mouf\Utils\Log\Psr\MultiLogger();
         $application = new Application();
         $application->add(new ZohoSyncDatabaseCommand($syncModel->reveal(), $dbCopier->reveal(), $pusher->reveal(),
-            $generator,$this->getZohoClient(), __DIR__.'/generated/','TestNamespace'));
+            $generator,$this->getZohoClient(), __DIR__.'/generated/','TestNamespace',$logger));
         
         $command = $application->find('zoho:sync');
         $commandTester = new CommandTester($command);
@@ -80,9 +78,10 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
         $dbCopier = $this->prophesize(ZohoDatabaseCopier::class);
         $pusher = $this->prophesize(ZohoDatabasePusher::class);
 
+        $logger = new \Mouf\Utils\Log\Psr\MultiLogger();
         $application = new Application();
         $application->add(new ZohoSyncDatabaseCommand($syncModel->reveal(), $dbCopier->reveal(), $pusher->reveal(),
-            $generator,$this->getZohoClient(), __DIR__.'/generated/','TestNamespace'));
+            $generator,$this->getZohoClient(), __DIR__.'/generated/','TestNamespace',$logger));
 
         $command = $application->find('zoho:sync');
         $commandTester = new CommandTester($command);

@@ -55,14 +55,6 @@ class ZohoDatabaseCopier
     }
 
     /**
-     * @param LoggerInterface $logger
-     */
-    public function setLogger(LoggerInterface $logger)
-    {
-        $this->logger = $logger;
-    }
-
-    /**
      * @param AbstractZohoDao $dao
      * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
      * @param bool            $twoWaysSync
@@ -77,31 +69,18 @@ class ZohoDatabaseCopier
 
         if ($incrementalSync) {
             $this->logger->info("Copying incremental data for '$tableName'");
-            //We need to check $lastActivity column exist.
-            /* @var $existedColumns \Doctrine\DBAL\Schema\Column[] */
-            $existedColumns = $this->connection->getSchemaManager()->listTableColumns($tableName);
-            $existLastActivityTime = false;
-            foreach ($existedColumns as $existedColumn) {
-                if($existedColumn->getName() == 'lastActivityTime'){
-                    $existLastActivityTime = true;
-                    break;
-                }
+            /////'SHOW COLUMNS FROM '.$tableName.' LIKE `lastActivityTime`');
+            // Let's get the last modification date:
+            $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(lastActivityTime) FROM '.$tableName);
+            if ($lastActivityTime !== null) {
+                $lastActivityTime = new \DateTime($lastActivityTime);
+                $this->logger->info('Last activity time: '.$lastActivityTime->format('c'));
+                // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
+                $lastActivityTime->add(new \DateInterval('PT1S'));
             }
-            // To avoid checking this column when it is not used in a table.
-            if($existLastActivityTime){
-                /////'SHOW COLUMNS FROM '.$tableName.' LIKE `lastActivityTime`');
-                // Let's get the last modification date:
-                $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(lastActivityTime) FROM '.$tableName);
-                if ($lastActivityTime !== null) {
-                    $lastActivityTime = new \DateTime($lastActivityTime);
-                    $this->logger->info('Last activity time: '.$lastActivityTime->format('c'));
-                    // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
-                    $lastActivityTime->add(new \DateInterval('PT1S'));
-                }
 
-                $records = $dao->getRecords(null, null, $lastActivityTime);
-                $deletedRecordIds = $dao->getDeletedRecordIds($lastActivityTime);
-            }
+            $records = $dao->getRecords(null, null, $lastActivityTime);
+            $deletedRecordIds = $dao->getDeletedRecordIds($lastActivityTime);
         } else {
             $this->logger->notice("Copying FULL data for '$tableName'");
             $records = $dao->getRecords();
