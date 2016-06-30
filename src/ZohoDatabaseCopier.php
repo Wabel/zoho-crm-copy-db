@@ -55,14 +55,6 @@ class ZohoDatabaseCopier
     }
 
     /**
-     * @param LoggerInterface $logger
-     */
-    public function setLogger(LoggerInterface $logger)
-    {
-        $this->logger = $logger;
-    }
-
-    /**
      * @param AbstractZohoDao $dao
      * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
      * @param bool            $twoWaysSync
@@ -77,6 +69,7 @@ class ZohoDatabaseCopier
 
         if ($incrementalSync) {
             $this->logger->info("Copying incremental data for '$tableName'");
+            /////'SHOW COLUMNS FROM '.$tableName.' LIKE `lastActivityTime`');
             // Let's get the last modification date:
             $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(lastActivityTime) FROM '.$tableName);
             if ($lastActivityTime !== null) {
