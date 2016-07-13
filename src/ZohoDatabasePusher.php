@@ -117,8 +117,8 @@ class ZohoDatabasePusher
         if (!$update) {
             foreach ($zohoBeans as $uid => $zohoBean) {
 //                $this->connection->beginTransaction();
-                $this->connection->update($tableName, ['id' => $zohoBean->getZohoId()], ['table_name'=>$tableName,'uid' => $uid]);
-                $this->connection->delete($localTable, ['table_name'=>$tableName, 'uid' => $uid ]);
+                $this->connection->update($tableName, ['id' => $zohoBean->getZohoId()], ['uid' => $uid]);
+                $this->connection->delete('local', ['table_name'=>$tableName, 'uid' => $uid ]);
 //                $this->connection->commit();
             }
         } else {
