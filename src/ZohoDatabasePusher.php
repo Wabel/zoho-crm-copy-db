@@ -118,7 +118,7 @@ class ZohoDatabasePusher
             foreach ($zohoBeans as $uid => $zohoBean) {
 //                $this->connection->beginTransaction();
                 $this->connection->update($tableName, ['id' => $zohoBean->getZohoId()], ['uid' => $uid]);
-                $this->connection->delete('local', ['table_name'=>$tableName, 'uid' => $uid ]);
+                $this->connection->delete('local_insert', ['table_name'=>$tableName, 'uid' => $uid ]);
 //                $this->connection->commit();
             }
         } else {
