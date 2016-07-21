@@ -49,9 +49,9 @@ class LocalChangesTracker
         $localDelete = $schema->createTable('local_delete');
         $localDelete->addColumn('table_name', 'string', ['length' => 100]);
         $localDelete->addColumn('uid', 'integer');
-        $localDelete->addColumn('id',  'string', ['length' => 100]);
+        $localDelete->addColumn('id',  'string', ['length' => 100,'notnull'=>false]);
         $localDelete->setPrimaryKey(array('table_name', 'uid'));
-        $localDelete->addUniqueIndex(['id', 'table_name','notnull'=>false]);
+        $localDelete->addUniqueIndex(['id', 'table_name']);
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
         $dbalTableDiffService->createOrUpdateTable($localUpdate);
