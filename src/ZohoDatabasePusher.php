@@ -113,13 +113,25 @@ class ZohoDatabasePusher
                 $rowsDeleted[] = $row['uid'];
             }
         }
-        $zohoDao->save($zohoBeans,false,  AbstractZohoDao::ON_DUPLICATE_THROW);
+        $zohoDao->save($zohoBeans);
         if (!$update) {
             foreach ($zohoBeans as $uid => $zohoBean) {
-                $this->connection->beginTransaction();
-                $this->connection->update($tableName, ['id' => $zohoBean->getZohoId()], ['uid' => $uid]);
-                $this->connection->delete('local_insert', ['table_name'=>$tableName, 'uid' => $uid ]);
-                $this->connection->commit();
+                $countResult = $this->connection->fetchColumn('select count(id) from '.$tableName.' where id = :id',['id'=>$zohoBean->getZohoId()]);
+                //If the sent data were duplicates Zoho can merged so we need to check if the Zoho ID already exist.
+                if($countResult === 0) {
+                    // ID not exist we can update the new row with the Zoho ID
+                    $this->connection->beginTransaction();
+                    $this->connection->update($tableName, ['id' => $zohoBean->getZohoId()], ['uid' => $uid]);
+                    $this->connection->delete('local_insert', ['table_name'=>$tableName, 'uid' => $uid ]);
+                    $this->connection->commit();
+                } else {
+                    //ID already exist we need to delete the duplicate row.
+                    $this->connection->beginTransaction();
+                    $this->connection->delete($tableName, ['uid' => $uid ]);
+                    $this->connection->delete('local_insert', ['table_name'=>$tableName, 'uid' => $uid ]);
+                    $this->connection->commit();
+                    
+                }
             }
         } else {
             $this->connection->executeUpdate('delete from local_update where uid in ( :rowsDeleted)',
