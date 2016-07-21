@@ -80,7 +80,7 @@ class ZohoDatabaseModelSync
 
         $flatFields = ZohoDatabaseHelper::getFlatFields($dao->getFields());
         $table->addColumn('uid', 'integer', ['autoincrement' => true]);
-        $table->addColumn('id', 'string', ['length' => 100]);
+        $table->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
         $table->addUniqueIndex(['id']);
         $table->setPrimaryKey(['uid']);
 
