@@ -51,7 +51,7 @@ class LocalChangesTracker
         $localDelete->addColumn('uid', 'integer');
         $localDelete->addColumn('id',  'string', ['length' => 100]);
         $localDelete->setPrimaryKey(array('table_name', 'uid'));
-        $localDelete->addUniqueIndex(['id', 'table_name']);
+        $localDelete->addUniqueIndex(['id', 'table_name','notnull'=>false]);
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
         $dbalTableDiffService->createOrUpdateTable($localUpdate);
