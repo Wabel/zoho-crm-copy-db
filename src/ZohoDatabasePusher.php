@@ -113,7 +113,7 @@ class ZohoDatabasePusher
                 $rowsDeleted[] = $row['uid'];
             }
         }
-        $zohoDao->save($zohoBeans);
+        $zohoDao->save($zohoBeans,false,  AbstractZohoDao::ON_DUPLICATE_THROW);
         if (!$update) {
             foreach ($zohoBeans as $uid => $zohoBean) {
                 $this->connection->beginTransaction();
