@@ -91,7 +91,9 @@ class LocalChangesTracker
             CREATE TRIGGER %s BEFORE DELETE ON `%s` 
             FOR EACH ROW
             BEGIN
-              INSERT INTO local_delete VALUES (%s, OLD.uid, OLD.id);
+              IF (OLD.id IS NOT NULL) THEN
+                INSERT INTO local_delete VALUES (%s, OLD.uid, OLD.id);
+              END IF;
               DELETE FROM local_insert WHERE table_name = %s AND uid = OLD.uid;
               DELETE FROM local_update WHERE table_name = %s AND uid = OLD.uid;
             END;
