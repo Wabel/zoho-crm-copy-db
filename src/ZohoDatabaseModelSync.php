@@ -134,9 +134,8 @@ class ZohoDatabaseModelSync
                 case 'Website':
                 case 'Pick List':
                 case 'Multiselect Pick List':
-                    $type = 'string';
                     // $field['maxlength'] is not enough
-                    $length = 255;
+                    $type = 'text';
                     break;
                 case 'Double':
                 case 'Percent':
