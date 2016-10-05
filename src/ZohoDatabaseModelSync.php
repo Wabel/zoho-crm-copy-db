@@ -136,7 +136,7 @@ class ZohoDatabaseModelSync
                 case 'Multiselect Pick List':
                     $type = 'string';
                     // $field['maxlength'] is not enough
-                    $length = 200;
+                    $length = 255;
                     break;
                 case 'Double':
                 case 'Percent':
