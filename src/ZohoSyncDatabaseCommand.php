@@ -120,6 +120,7 @@ class ZohoSyncDatabaseCommand extends Command
             $this->regenerateZohoDao($output);
             
             $this->syncModel($input, $output);
+            $this->syncUserModel($input, $output);
 
             if (!$input->getOption('push-only')) {
                 $this->fetchDb($input, $output);
@@ -151,6 +152,17 @@ class ZohoSyncDatabaseCommand extends Command
         }
         $output->writeln('Zoho data successfully synchronized.');
     }
+
+    /**
+     * Sychronizes the model of the database with Zoho Users records.
+     *
+     * @param OutputInterface $output
+     */
+    private function syncUserModel(InputInterface $input, OutputInterface $output)
+    {
+
+    }
+
 
     /**
      * @param AbstractZohoDao $zohoDao
