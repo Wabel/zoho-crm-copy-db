@@ -6,6 +6,7 @@ use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
+use Wabel\Zoho\CRM\Request\Response;
 
 /**
  * This class is in charge of synchronizing one table of your database with Zoho records.
@@ -54,6 +55,58 @@ class ZohoDatabaseCopier
         $this->localChangesTracker = new LocalChangesTracker($connection, $this->logger);
     }
 
+    /**
+     * @param Response $userResponse
+     * 
+     * @throws \Doctrine\DBAL\DBALException
+     * @throws \Doctrine\DBAL\Schema\SchemaException
+     * @throws \Wabel\Zoho\CRM\Exception\ZohoCRMResponseException
+     */
+    public function fetchUserFromZoho(Response $userResponse)
+    {
+        $tableName = 'users';
+        $this->logger->notice("Copying FULL data users for '$tableName'");
+        $records = $userResponse->getRecords();
+        $this->logger->info('Fetched '.count($records).' records');
+
+        $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
+        
+        $select = $this->connection->prepare('SELECT * FROM '.$tableName.' WHERE id = :id');
+
+        $this->connection->beginTransaction();
+        foreach ($records as $record) {
+            $data = [];
+            $types = [];
+            foreach ($table->getColumns() as $column) {
+                if (in_array($column->getName(), ['id', 'uid'])) {
+                    continue;
+                } else {
+                    $data[$column->getName()] = $record[$column->getName()];
+                    $types[$column->getName()] = $column->getType()->getName();
+                }
+            }
+
+            $select->execute(['id' => $record['id']]);
+            $result = $select->fetch(\PDO::FETCH_ASSOC);
+            if ($result === false) {
+                $this->logger->debug("Inserting record with ID '".$record['id']."'.");
+
+                $data['id'] = $record['id'];
+                $types['id'] = 'string';
+
+                $this->connection->insert($tableName, $data, $types);
+
+            } else {
+                $this->logger->debug("Updating record with ID '".$record['id']."'.");
+                $identifier = ['id' => $record['id']];
+                $types['id'] = 'string';
+
+                $this->connection->update($tableName, $data, $identifier, $types);
+            }
+        }
+        $this->connection->commit();
+    }
+    
     /**
      * @param AbstractZohoDao $dao
      * @param bool            $incrementalSync Whether we synchronize only the modified files or everything.
