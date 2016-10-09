@@ -7,6 +7,7 @@ use Doctrine\DBAL\Schema\Schema;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
+use Wabel\Zoho\CRM\Request\Response;
 
 /**
  * This class is in charge of synchronizing one table MODEL with Zoho.
@@ -175,5 +176,65 @@ class ZohoDatabaseModelSync
             $this->localChangesTracker->createDeleteTrigger($table);
             $this->localChangesTracker->createUpdateTrigger($table);
         }
+    }
+
+    public function synchronizeUserDbModel(Response $users)
+    {
+        $tableName = 'users';
+
+        $schema = new Schema();
+        $table = $schema->createTable($tableName);
+
+        $flatFields = $users->getUserFields();
+        $table->addColumn('uid', 'integer', ['autoincrement' => true]);
+        $table->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
+        $table->addUniqueIndex(['id']);
+        $table->setPrimaryKey(['uid']);
+        foreach ($flatFields as $field) {
+            if(in_array($field, ['id'])){
+                continue;
+            }
+            $columnName = $field;
+            $length = null;
+            $index = false;
+            switch ($field) {
+                case 'zuid':
+                    $type = 'string';
+                    $length = 100;
+                    $index = true;
+                    break;
+                case 'name':
+                case 'email':
+                    $type = 'string';
+                    $length = 255;
+                    $index = true;
+                    break;
+                case 'phone':
+                case 'website':
+                    $type = 'text';
+                    break;
+                default:
+                    $type = 'string';
+                    $length = 100;
+            }
+
+            $options = [];
+
+            if ($length) {
+                $options['length'] = $length;
+            }
+
+            //$options['notnull'] = $field['req'];
+            $options['notnull'] = false;
+
+            $table->addColumn($columnName, $type, $options);
+
+            if ($index) {
+                $table->addIndex([$columnName]);
+            }
+        }
+
+        $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
+        $dbalTableDiffService->createOrUpdateTable($table);
     }
 }

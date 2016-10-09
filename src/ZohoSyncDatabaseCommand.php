@@ -14,6 +14,7 @@ use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 use Wabel\Zoho\CRM\ZohoClient;
 use Logger\Formatters\DateTimeFormatter;
 use Mouf\Utils\Log\Psr\MultiLogger;
+use Wabel\Zoho\CRM\Request\Response;
 
 class ZohoSyncDatabaseCommand extends Command
 {
@@ -66,6 +67,12 @@ class ZohoSyncDatabaseCommand extends Command
 
     private $namespaceZohoDaos;
 
+    /**
+     *
+     * @var Response
+     */
+    private $usersResponse;
+
 
     /**
      * @param ZohoDatabaseModelSync $zohoDatabaseModelSync
@@ -117,12 +124,16 @@ class ZohoSyncDatabaseCommand extends Command
                 $output->writeln('<error>Options fetch-only and push-only are mutually exclusive.</error>');
             }
 
+            $this->syncUserModel($output);
+
             $this->regenerateZohoDao($output);
-            
+
             $this->syncModel($input, $output);
 
             if (!$input->getOption('push-only')) {
+                $this->fetchUserDb($input, $output);
                 $this->fetchDb($input, $output);
+                
             }
             if (!$input->getOption('fetch-only')) {
                 $this->pushDb($output);
@@ -151,6 +162,34 @@ class ZohoSyncDatabaseCommand extends Command
         }
         $output->writeln('Zoho data successfully synchronized.');
     }
+
+
+
+    /**
+     * Generate the User Response from Zoho
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     */
+    private function getUsersReponse(OutputInterface $output)
+    {
+        $output->writeln("Start to request users data from zoho.");
+        $this->usersResponse =$this->zohoClient->getUsers();
+        $output->writeln("Finish to requuest users data from zoho.");
+    }
+
+    /**
+     * Sychronizes the model of the database with Zoho Users records.
+     *
+     * @param OutputInterface $output
+     */
+    private function syncUserModel(OutputInterface $output)
+    {
+        $this->getUsersReponse($output);
+        $output->writeln('Starting synchronize Zoho users model.');
+        $this->zohoDatabaseModelSync->synchronizeUserDbModel($this->usersResponse);
+        $output->writeln('Zoho users model successfully synchronized.');
+    }
+
 
     /**
      * @param AbstractZohoDao $zohoDao
@@ -188,6 +227,19 @@ class ZohoSyncDatabaseCommand extends Command
             $output->writeln(sprintf('<info>%s has created</info>', get_class($zohoDao)));
         }
         $output->writeln("Success to create all the zoho daos.");
+    }
+
+    /**
+     * Run the fetch User Db command.
+     *
+     * @param InputInterface  $input
+     * @param OutputInterface $output
+     */
+    private function fetchUserDb(InputInterface $input, OutputInterface $output)
+    {
+        $output->writeln('Starting copying Zoho users data into local database.');
+        $this->zohoDatabaseCopier->fetchUserFromZoho($this->usersResponse);
+        $output->writeln('Zoho users data successfully copied.');
     }
     
     

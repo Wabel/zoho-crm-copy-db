@@ -25,7 +25,7 @@ This projects provides a `ZohoDatabaseCopier` class, with a simple `fetchFromZoh
 It also provides a `ZohoDatabasePusher` class with a  `pushToZoho` method to push data to Zoho CRM.
 
 -----------------
-<h4>ZohoDatabaseCopier</h4>
+<h4>ZohoDatabaseCopier for Module</h4>
 
 Usage:
 
@@ -53,6 +53,21 @@ everything, you can use the second parameter of the `copy` method:
 ```php
 // Pass false as second parameter to force copying everything rather than doing an incremental copy.
 $databaseCopier->fetchFromZoho($contactZohoDao, false);
+```
+-----------------
+<h4>ZohoDatabaseCopier for Users</h4>
+
+With the same `$databaseCopier` you can fetch the users from zoho.
+Usage:
+
+```php
+// $connection is a Doctrine DBAL connection to your database.
+$databaseCopier = new ZohoDatabaseCopier($connection);
+
+
+```php
+// $userResponse is the Zoho Client Response from zoho-crm-orm package.
+$databaseCopier->fetchUserFromZoho($userResponse);
 ```
 -----------------
 <h4>ZohoDatabasePusher</h4>
