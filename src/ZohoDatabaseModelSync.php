@@ -186,10 +186,8 @@ class ZohoDatabaseModelSync
         $table = $schema->createTable($tableName);
 
         $flatFields = $users->getUserFields();
-        $table->addColumn('uid', 'integer', ['autoincrement' => true]);
         $table->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
-        $table->addUniqueIndex(['id']);
-        $table->setPrimaryKey(['uid']);
+        $table->setPrimaryKey(['id']);
         foreach ($flatFields as $field) {
             if(in_array($field, ['id'])){
                 continue;
