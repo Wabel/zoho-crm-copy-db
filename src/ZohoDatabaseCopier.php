@@ -78,7 +78,7 @@ class ZohoDatabaseCopier
             $data = [];
             $types = [];
             foreach ($table->getColumns() as $column) {
-                if (in_array($column->getName(), ['id', 'uid'])) {
+                if (in_array($column->getName(), ['id'])) {
                     continue;
                 } else {
                     $data[$column->getName()] = $record[$column->getName()];
