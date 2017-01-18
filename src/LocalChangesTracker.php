@@ -59,6 +59,24 @@ class LocalChangesTracker
         $dbalTableDiffService->createOrUpdateTable($localDelete);
     }
 
+    public function createUuidInsertTrigger(Table $table)
+    {
+        $triggerName = sprintf('TRG_%s_SETUUIDBEFOREINSERT', $table->getName());
+
+        $sql = sprintf('
+            DROP TRIGGER IF EXISTS %s;
+            
+            CREATE TRIGGER %s BEFORE INSERT ON `%s` 
+            FOR EACH ROW
+              IF new.uid IS NULL
+              THEN
+                SET new.uid = uuid();
+              END IF;
+            ', $triggerName, $triggerName, $table->getName());
+
+        $this->connection->exec($sql);
+    }
+
     public function createInsertTrigger(Table $table)
     {
         $triggerName = sprintf('TRG_%s_ONINSERT', $table->getName());

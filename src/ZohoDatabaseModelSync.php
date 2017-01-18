@@ -80,7 +80,7 @@ class ZohoDatabaseModelSync
         $table = $schema->createTable($tableName);
 
         $flatFields = ZohoDatabaseHelper::getFlatFields($dao->getFields());
-        $table->addColumn('uid', 'integer', ['autoincrement' => true]);
+        $table->addColumn('uid', 'string', ['length' => 36]);
         $table->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
         $table->addUniqueIndex(['id']);
         $table->setPrimaryKey(['uid']);
@@ -171,6 +171,8 @@ class ZohoDatabaseModelSync
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
         $hasChanges = $dbalTableDiffService->createOrUpdateTable($table);
+        $this->localChangesTracker->createUuidInsertTrigger($table);
+
         if ($twoWaysSync && ($hasChanges || !$skipCreateTrigger)) {
             $this->localChangesTracker->createInsertTrigger($table);
             $this->localChangesTracker->createDeleteTrigger($table);

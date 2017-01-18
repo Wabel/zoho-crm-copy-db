@@ -17,8 +17,8 @@
 		"symfony/console": "~2.0 | ~3.0",
 		"mouf/utils.common.lock": "~1.0",
 		"danielstjules/stringy": "~2.2",
-                "mouf/utils.log.psr.multi-logger": "^1.0",
-                "logger/essentials" : "^0.1.9"
+		"mouf/utils.log.psr.multi-logger": "^1.0",
+		"logger/essentials" : "^0.1.9"
 	},
     "require-dev" : {
 	  "phpunit/phpunit": "~4.0",
