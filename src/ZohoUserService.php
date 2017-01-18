@@ -33,7 +33,7 @@ class ZohoUserService
     public function getUsers()
     {
         if ($this->usersResponse !== null) {
-            return $this->usersResponse();
+            return $this->usersResponse;
         }
 
         $this->usersResponse = $this->zohoClient->getUsers();
