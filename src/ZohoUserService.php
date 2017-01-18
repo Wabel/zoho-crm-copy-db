@@ -27,7 +27,10 @@ class ZohoUserService
         $this->zohoClient = $zohoClient;
     }
 
-    public function getUsers() : Response
+    /**
+     * @return Response
+     */
+    public function getUsers()
     {
         if ($this->usersResponse !== null) {
             return $this->usersResponse();
