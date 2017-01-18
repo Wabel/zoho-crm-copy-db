@@ -30,6 +30,10 @@ class ZohoDatabaseModelSync
      * @var LocalChangesTracker
      */
     private $localChangesTracker;
+    /**
+     * @var ZohoUserService
+     */
+    private $zohoUserService;
 
     /**
      * ZohoDatabaseCopier constructor.
@@ -37,7 +41,7 @@ class ZohoDatabaseModelSync
      * @param Connection $connection
      * @param string     $prefix     Prefix for the table name in DB
      */
-    public function __construct(Connection $connection, $prefix = 'zoho_', LoggerInterface $logger = null)
+    public function __construct(Connection $connection, ZohoUserService $zohoUserService, $prefix = 'zoho_', LoggerInterface $logger = null)
     {
         $this->connection = $connection;
         $this->prefix = $prefix;
@@ -47,6 +51,7 @@ class ZohoDatabaseModelSync
             $this->logger = $logger;
         }
         $this->localChangesTracker = new LocalChangesTracker($connection, $this->logger);
+        $this->zohoUserService = $zohoUserService;
     }
 
     /**
@@ -180,8 +185,9 @@ class ZohoDatabaseModelSync
         }
     }
 
-    public function synchronizeUserDbModel(Response $users)
+    public function synchronizeUserDbModel()
     {
+        $users = $this->zohoUserService->getUsers();
         $tableName = 'users';
 
         $schema = new Schema();
@@ -191,7 +197,7 @@ class ZohoDatabaseModelSync
         $table->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
         $table->setPrimaryKey(['id']);
         foreach ($flatFields as $field) {
-            if(in_array($field, ['id'])){
+            if (in_array($field, ['id'])) {
                 continue;
             }
             $columnName = $field;

@@ -34,6 +34,11 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
         return new ZohoClient($GLOBALS['auth_token']);
     }
 
+    public function getZohoUserService()
+    {
+        return new ZohoUserService($this->getZohoClient());
+    }
+
     /**
      * @depends Wabel\Zoho\CRM\Copy\ZohoDatabaseModelSyncTest::testModelSync
      */
@@ -50,7 +55,7 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
         $testContact->setEmail($testContact->getLastName().'@test.com');
         $contactZohoDao->save($testContact);
 
-        $databaseCopier = new ZohoDatabaseCopier($this->dbConnection, 'zoho_', [$listener]);
+        $databaseCopier = new ZohoDatabaseCopier($this->dbConnection, $this->getZohoUserService(), 'zoho_', [$listener]);
 
         $databaseCopier->fetchFromZoho($contactZohoDao);
 

@@ -37,19 +37,19 @@ class LocalChangesTracker
 
         $localUpdate = $schema->createTable('local_update');
         $localUpdate->addColumn('table_name', 'string', ['length' => 100]);
-        $localUpdate->addColumn('uid', 'integer');
+        $localUpdate->addColumn('uid', 'string', ['length' => 36]);
         $localUpdate->addColumn('field_name', 'string', ['length' => 100]);
         $localUpdate->setPrimaryKey(array('table_name', 'uid', 'field_name'));
 
         $localInsert = $schema->createTable('local_insert');
         $localInsert->addColumn('table_name', 'string', ['length' => 100]);
-        $localInsert->addColumn('uid', 'integer');
+        $localInsert->addColumn('uid', 'string', ['length' => 36]);
         $localInsert->setPrimaryKey(array('table_name', 'uid'));
 
         $localDelete = $schema->createTable('local_delete');
         $localDelete->addColumn('table_name', 'string', ['length' => 100]);
-        $localDelete->addColumn('uid', 'integer');
-        $localDelete->addColumn('id',  'string', ['length' => 100,'notnull'=>false]);
+        $localDelete->addColumn('uid', 'string', ['length' => 36]);
+        $localDelete->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
         $localDelete->setPrimaryKey(array('table_name', 'uid'));
         $localDelete->addUniqueIndex(['id', 'table_name']);
 

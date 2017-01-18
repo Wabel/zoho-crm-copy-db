@@ -45,8 +45,8 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($this->dbConnection->getSchemaManager()->tablesExist($tableName));
         // Test insert
         $data = [
-            'firstName' => 'TestZohoSync',
-            'lastName' => uniqid('Test'),
+            'firstName' => $this->randName(),
+            'lastName' => $this->randName(),
             'dateOfBirth' => date('Y-m-d'),
         ];
         $data['email'] = $data['lastName'].'@test.com';
@@ -113,6 +113,16 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
             $isRecordSearch = null;
         }
         $this->assertFalse($isRecordSearch);
+    }
+
+    private function randName()
+    {
+        $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+        $result = '';
+        for ($i = 0; $i < 10; $i++) {
+            $result .= $characters[mt_rand(0, 51)];
+        }
+        return $result;
     }
 
     protected function tearDown()

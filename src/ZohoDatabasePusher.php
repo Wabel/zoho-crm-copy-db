@@ -116,9 +116,9 @@ class ZohoDatabasePusher
         $zohoDao->save($zohoBeans);
         if (!$update) {
             foreach ($zohoBeans as $uid => $zohoBean) {
-                $countResult = $this->connection->fetchColumn('select count(id) from '.$tableName.' where id = :id',['id'=>$zohoBean->getZohoId()]);
+                $countResult = (int) $this->connection->fetchColumn('select count(id) from '.$tableName.' where id = :id', ['id'=>$zohoBean->getZohoId()]);
                 //If the sent data were duplicates Zoho can merged so we need to check if the Zoho ID already exist.
-                if($countResult === 0) {
+                if ($countResult === 0) {
                     // ID not exist we can update the new row with the Zoho ID
                     $this->connection->beginTransaction();
                     $this->connection->update($tableName, ['id' => $zohoBean->getZohoId()], ['uid' => $uid]);
@@ -130,7 +130,6 @@ class ZohoDatabasePusher
                     $this->connection->delete($tableName, ['uid' => $uid ]);
                     $this->connection->delete('local_insert', ['table_name'=>$tableName, 'uid' => $uid ]);
                     $this->connection->commit();
-                    
                 }
             }
         } else {
@@ -191,7 +190,7 @@ class ZohoDatabasePusher
     private function formatValueToBeans($type, $value)
     {
         switch ($type) {
-            case 'Date' :
+            case 'Date':
                 $value = \DateTime::createFromFormat('Y-m-d', $value);
                 break;
             case 'DateTime':
@@ -259,5 +258,4 @@ class ZohoDatabasePusher
         $this->logger->info(' > Delete rows using  {class_name}', ['class_name' => get_class($zohoDao)]);
         $this->pushDeletedRows($zohoDao);
     }
-    
 }
