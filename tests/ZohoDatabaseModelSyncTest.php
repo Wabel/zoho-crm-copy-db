@@ -50,6 +50,11 @@ class ZohoDatabaseModelSyncTest extends \PHPUnit_Framework_TestCase
         return new ZohoClient($GLOBALS['auth_token']);
     }
 
+    public function getZohoUserService()
+    {
+        return new ZohoUserService($this->getZohoClient());
+    }
+
     public function getEntitiesGeneratorService()
     {
         return new EntitiesGeneratorService($this->getZohoClient(), new NullLogger());
@@ -65,7 +70,7 @@ class ZohoDatabaseModelSyncTest extends \PHPUnit_Framework_TestCase
 
         $contactZohoDao = new ContactZohoDao($this->getZohoClient());
 
-        $databaseModelSync = new ZohoDatabaseModelSync($this->dbConnection, 'zoho_');
+        $databaseModelSync = new ZohoDatabaseModelSync($this->dbConnection, $this->getZohoUserService(), 'zoho_');
 
         $databaseModelSync->synchronizeDbModel($contactZohoDao, true);
 

@@ -34,6 +34,10 @@ class ZohoDatabaseCopier
      * @var LocalChangesTracker
      */
     private $localChangesTracker;
+    /**
+     * @var ZohoUserService
+     */
+    private $zohoUserService;
 
     /**
      * ZohoDatabaseCopier constructor.
@@ -42,7 +46,7 @@ class ZohoDatabaseCopier
      * @param string               $prefix     Prefix for the table name in DB
      * @param ZohoChangeListener[] $listeners  The list of listeners called when a record is inserted or updated.
      */
-    public function __construct(Connection $connection, $prefix = 'zoho_', array $listeners = [], LoggerInterface $logger = null)
+    public function __construct(Connection $connection, ZohoUserService $zohoUserService, $prefix = 'zoho_', array $listeners = [], LoggerInterface $logger = null)
     {
         $this->connection = $connection;
         $this->prefix = $prefix;
@@ -53,17 +57,17 @@ class ZohoDatabaseCopier
             $this->logger = $logger;
         }
         $this->localChangesTracker = new LocalChangesTracker($connection, $this->logger);
+        $this->zohoUserService = $zohoUserService;
     }
 
     /**
-     * @param Response $userResponse
-     * 
      * @throws \Doctrine\DBAL\DBALException
      * @throws \Doctrine\DBAL\Schema\SchemaException
      * @throws \Wabel\Zoho\CRM\Exception\ZohoCRMResponseException
      */
-    public function fetchUserFromZoho(Response $userResponse)
+    public function fetchUserFromZoho()
     {
+        $userResponse = $this->zohoUserService->getUsers();
         $tableName = 'users';
         $this->logger->notice("Copying FULL data users for '$tableName'");
         $records = $userResponse->getRecords();
@@ -95,7 +99,6 @@ class ZohoDatabaseCopier
                 $types['id'] = 'string';
 
                 $this->connection->insert($tableName, $data, $types);
-
             } else {
                 $this->logger->debug("Updating record with ID '".$record['id']."'.");
                 $identifier = ['id' => $record['id']];

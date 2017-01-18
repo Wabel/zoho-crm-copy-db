@@ -133,7 +133,6 @@ class ZohoSyncDatabaseCommand extends Command
             if (!$input->getOption('push-only')) {
                 $this->fetchUserDb($input, $output);
                 $this->fetchDb($input, $output);
-                
             }
             if (!$input->getOption('fetch-only')) {
                 $this->pushDb($output);
@@ -163,20 +162,6 @@ class ZohoSyncDatabaseCommand extends Command
         $output->writeln('Zoho data successfully synchronized.');
     }
 
-
-
-    /**
-     * Generate the User Response from Zoho
-     * @param InputInterface $input
-     * @param OutputInterface $output
-     */
-    private function getUsersReponse(OutputInterface $output)
-    {
-        $output->writeln("Start to request users data from zoho.");
-        $this->usersResponse =$this->zohoClient->getUsers();
-        $output->writeln("Finish to requuest users data from zoho.");
-    }
-
     /**
      * Sychronizes the model of the database with Zoho Users records.
      *
@@ -184,9 +169,8 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function syncUserModel(OutputInterface $output)
     {
-        $this->getUsersReponse($output);
         $output->writeln('Starting synchronize Zoho users model.');
-        $this->zohoDatabaseModelSync->synchronizeUserDbModel($this->usersResponse);
+        $this->zohoDatabaseModelSync->synchronizeUserDbModel();
         $output->writeln('Zoho users model successfully synchronized.');
     }
 
@@ -216,11 +200,11 @@ class ZohoSyncDatabaseCommand extends Command
     private function regenerateZohoDao(OutputInterface $output)
     {
         $output->writeln("Start to generate all the zoho daos.");
-        $zohoModules = $this->zohoEntitiesGenerator->generateAll($this->pathZohoDaos,$this->namespaceZohoDaos);
+        $zohoModules = $this->zohoEntitiesGenerator->generateAll($this->pathZohoDaos, $this->namespaceZohoDaos);
         foreach ($zohoModules as $daoFullClassName) {
             /* @var $zohoDao AbstractZohoDao */
             $zohoDao = new $daoFullClassName($this->zohoClient);
-            if(!in_array('lastActivityTime', $this->getListFieldName($zohoDao))){
+            if (!in_array('lastActivityTime', $this->getListFieldName($zohoDao))) {
                 continue;
             }
             $this->zohoDaos [] = $zohoDao;
@@ -238,7 +222,7 @@ class ZohoSyncDatabaseCommand extends Command
     private function fetchUserDb(InputInterface $input, OutputInterface $output)
     {
         $output->writeln('Starting copying Zoho users data into local database.');
-        $this->zohoDatabaseCopier->fetchUserFromZoho($this->usersResponse);
+        $this->zohoDatabaseCopier->fetchUserFromZoho();
         $output->writeln('Zoho users data successfully copied.');
     }
     
@@ -274,7 +258,6 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function pushDb(OutputInterface $output)
     {
-
         $output->writeln('Starting synchronize Zoho data into Zoho CRM.');
         foreach ($this->zohoDaos as $zohoDao) {
             $this->zohoDatabaseSync->pushToZoho($zohoDao);

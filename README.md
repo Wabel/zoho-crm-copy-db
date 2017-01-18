@@ -82,6 +82,11 @@ $databaseSync = new ZohoDatabasePusher($connection);
 $databaseSync->pushToZoho($contactZohoDao);
 ```
 
+Requirements
+------------
+
+This project requires MySQL 5.7+ to work.
+
 Symfony command
 ---------------
 
