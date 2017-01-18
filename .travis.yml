@@ -1,6 +1,6 @@
-dist: trusty
-sudo: false
 language: php
+addons:
+  mariadb: '10.0'
 
 php:
  - 5.6
