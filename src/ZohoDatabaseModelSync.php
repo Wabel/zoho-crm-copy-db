@@ -85,10 +85,12 @@ class ZohoDatabaseModelSync
         $table = $schema->createTable($tableName);
 
         $flatFields = ZohoDatabaseHelper::getFlatFields($dao->getFields());
-        $table->addColumn('uid', 'string', ['length' => 36]);
+        //@Temporary fix to use Mysql5.7 not strict
+        $table->addColumn('uid', 'string', ['length' => 36,'notnull'=>false]);
         $table->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
         $table->addUniqueIndex(['id']);
-        $table->setPrimaryKey(['uid']);
+        //@Temporary fix to use Mysql5.7 not strict
+//        $table->setPrimaryKey(['uid']);
 
         foreach ($flatFields as $field) {
             $columnName = $field['name'];
