@@ -12,6 +12,9 @@ php:
  - 5.6
 
 before_script:
+ - echo -e "[server]\nmax_allowed_packet=512M\nwait_timeout=20" | sudo tee -a /etc/mysql/conf.d/cope.cnf
+ - sudo service mysql restart
+ - mysql -e "SHOW VARIABLES LIKE 'max_allowed_packet';"
  - wget http://getcomposer.org/composer.phar
  - php composer.phar install --dev --no-interaction
 
