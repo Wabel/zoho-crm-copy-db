@@ -63,14 +63,22 @@ class LocalChangesTracker
     {
         $triggerName = sprintf('TRG_%s_SETUUIDBEFOREINSERT', $table->getName());
 
+        //Fix - temporary MySQL 5.7 strict mode
         $sql = sprintf('
             DROP TRIGGER IF EXISTS %s;
             
             CREATE TRIGGER %s BEFORE INSERT ON `%s` 
             FOR EACH ROW
-              IF new.uid IS NULL
+            IF new.uid IS NULL
               THEN
-                SET new.uid = uuid();
+              	SET @uuidmy = uuid();
+                SET new.uid = LOWER(CONCAT(
+                SUBSTR(HEX(@uuidmy), 1, 8), \'-\',
+                SUBSTR(HEX(@uuidmy), 9, 4), \'-\',
+                SUBSTR(HEX(@uuidmy), 13, 4), \'-\',
+                SUBSTR(HEX(@uuidmy), 17, 4), \'-\',
+                SUBSTR(HEX(@uuidmy), 21)
+              ));
               END IF;
             ', $triggerName, $triggerName, $table->getName());
 
