@@ -100,7 +100,7 @@ class ZohoDatabaseCopier
 
         $table->addColumn('id', 'string', ['length' => 100]);
         $table->setPrimaryKey(['id']);
-
+        
         foreach ($flatFields as $field) {
             $columnName = $field['name'];
 
@@ -184,6 +184,10 @@ class ZohoDatabaseCopier
                 $table->addIndex([$columnName]);
             }
         }
+        
+        /* add columns "Created Time" and "Modified Time" */
+        $table->addColumn('createdTime', 'datetime', ['notnull' => false]);
+        $table->addColumn('modifiedTime', 'datetime', ['notnull' => false]);
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
         $hasChanges = $dbalTableDiffService->createOrUpdateTable($table);
@@ -244,13 +248,14 @@ class ZohoDatabaseCopier
             $data = [];
             $types = [];
             foreach ($table->getColumns() as $column) {
-                if ($column->getName() === 'id') {
+                $nameColumn = $column->getName();
+                if ($nameColumn === 'id' || $nameColumn === 'createdTime' || $nameColumn === 'modifiedTime') {
                     continue;
                 } else {
                     $field = $fieldsByName[$column->getName()];
                     $getterName = $field['getter'];
-                    $data[$column->getName()] = $record->$getterName();
-                    $types[$column->getName()] = $column->getType()->getName();
+                    $data[$nameColumn] = $record->$getterName();
+                    $types[$nameColumn] = $column->getType()->getName();
                 }
             }
 
@@ -261,6 +266,10 @@ class ZohoDatabaseCopier
 
                 $data['id'] = $record->getZohoId();
                 $types['id'] = 'string';
+                $data['createdTime'] = $record->getCreatedTime();
+                $types['createdTime'] = 'datetime';
+                $data['modifiedTime'] = $record->getModifiedTime();
+                $types['modifiedTime'] = 'datetime';
 
                 $this->connection->insert($tableName, $data, $types);
 
@@ -271,11 +280,17 @@ class ZohoDatabaseCopier
                 $this->logger->debug("Updating record with ID '".$record->getZohoId()."'.");
                 $identifier = ['id' => $record->getZohoId()];
                 $types['id'] = 'string';
+                $identifier['createdTime'] = $record->getCreatedTime();
+                $types['createdTime'] = 'datetime';
+                $identifier['modifiedTime'] = $record->getModifiedTime();
+                $types['modifiedTime'] = 'datetime';
 
                 $this->connection->update($tableName, $data, $identifier, $types);
 
                 // Let's add the id for the update trigger
                 $data['id'] = $record->getZohoId();
+                $data['createdTime'] = $record->getCreatedTime();
+                $data['modifiedTime'] = $record->getModifiedTime();
                 foreach ($this->listeners as $listener) {
                     $listener->onUpdate($data, $result, $dao);
                 }
