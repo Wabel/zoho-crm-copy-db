@@ -95,7 +95,7 @@ class LocalChangesTracker
             CREATE TRIGGER %s AFTER INSERT ON `%s` 
             FOR EACH ROW
             BEGIN
-              IF (NEW.lastActivityTime IS NULL) THEN
+              IF (NEW.id IS NULL AND NEW.createdTime IS NULL ) THEN
                 INSERT INTO local_insert VALUES (%s, NEW.uid);
                 DELETE FROM local_delete WHERE table_name = %s AND uid = NEW.uid;
                 DELETE FROM local_update WHERE table_name = %s AND uid = NEW.uid;
@@ -153,7 +153,7 @@ class LocalChangesTracker
             CREATE TRIGGER %s AFTER UPDATE ON `%s` 
             FOR EACH ROW
             BEGIN
-              IF (NEW.lastActivityTime <=> OLD.lastActivityTime) THEN
+              IF (NEW.modifiedTime <=> OLD.modifiedTime) THEN
             %s
               END IF;
             END;
