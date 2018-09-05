@@ -204,7 +204,8 @@ class ZohoSyncDatabaseCommand extends Command
         foreach ($zohoModules as $daoFullClassName) {
             /* @var $zohoDao AbstractZohoDao */
             $zohoDao = new $daoFullClassName($this->zohoClient);
-            if (!in_array('lastActivityTime', $this->getListFieldName($zohoDao))) {
+            //To have more module which is use time of modification (createdTime or lastActivityTime.
+            if (!in_array('createdTime', $this->getListFieldName($zohoDao))) {
                 continue;
             }
             $this->zohoDaos [] = $zohoDao;
@@ -245,8 +246,8 @@ class ZohoSyncDatabaseCommand extends Command
 
         $output->writeln('Starting copying Zoho data into local database.');
         foreach ($this->zohoDaos as $zohoDao) {
-            $output->writeln(sprintf('Copying data using <info>%s</info>', get_class($zohoDao)));
-            $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync);
+                $output->writeln(sprintf('Copying data using <info>%s</info>', get_class($zohoDao)));
+                $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync);
         }
         $output->writeln('Zoho data successfully copied.');
     }

@@ -93,6 +93,10 @@ class ZohoDatabaseModelSync
 
         foreach ($flatFields as $field) {
             $columnName = $field['name'];
+            //It seems sometime we can have the same field twice in the list of fields from the API.
+            if($table->hasColumn($columnName)){
+                continue;
+            }
 
             $length = null;
             $index = false;
@@ -154,6 +158,9 @@ class ZohoDatabaseModelSync
                 case 'Currency':
                 case 'Decimal':
                     $type = 'decimal';
+                    break;
+                case 'ConsentLookup':
+                    continue 2;
                     break;
                 default:
                     throw new \RuntimeException('Unknown type "'.$field['type'].'"');
