@@ -36,7 +36,7 @@ class ZohoDatabasePusher
      * @param string $prefix
      * @param LoggerInterface $logger
      */
-    public function __construct(Connection $connection, $apiLimitInsertUpdateDelete, $prefix = 'zoho_', LoggerInterface $logger = null)
+    public function __construct(Connection $connection, $apiLimitInsertUpdateDelete = 100, $prefix = 'zoho_', LoggerInterface $logger = null)
     {
         $this->connection = $connection;
         $this->prefix = $prefix;
@@ -46,6 +46,9 @@ class ZohoDatabasePusher
             $this->logger = $logger;
         }
         $this->apiLimitInsertUpdateDelete = $apiLimitInsertUpdateDelete;
+        if($apiLimitInsertUpdateDelete === null){
+            $this->apiLimitInsertUpdateDelete = 100;
+        }
     }
 
     /**
