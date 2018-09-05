@@ -127,7 +127,13 @@ class ZohoDatabaseCopier
             $this->logger->info("Copying incremental data for '$tableName'");
             /////'SHOW COLUMNS FROM '.$tableName.' LIKE `lastActivityTime`');
             // Let's get the last modification date:
-            $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(lastActivityTime) FROM '.$tableName);
+            $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
+            //We use createdTime instead of lastActivityTime when the field doesn't exist in order to follow changes.
+            if($tableDetail->hasColumn('lastActivityTime')){
+                $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(lastActivityTime) FROM '.$tableName);
+            } else{
+                $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM '.$tableName);
+            }
             if ($lastActivityTime !== null) {
                 $lastActivityTime = new \DateTime($lastActivityTime);
                 $this->logger->info('Last activity time: '.$lastActivityTime->format('c'));
