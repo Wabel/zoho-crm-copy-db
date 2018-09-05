@@ -31,11 +31,12 @@ class ZohoDatabasePusher
     private $prefix;
 
     /**
-     * @param Connection      $connection
-     * @param string          $prefix
+     * @param Connection $connection
+     * @param int $apiLimitInsertUpdateDelete
+     * @param string $prefix
      * @param LoggerInterface $logger
      */
-    public function __construct(Connection $connection, $prefix = 'zoho_', LoggerInterface $logger = null)
+    public function __construct(Connection $connection, $apiLimitInsertUpdateDelete, $prefix = 'zoho_', LoggerInterface $logger = null)
     {
         $this->connection = $connection;
         $this->prefix = $prefix;
@@ -44,7 +45,13 @@ class ZohoDatabasePusher
         } else {
             $this->logger = $logger;
         }
+        $this->apiLimitInsertUpdateDelete = $apiLimitInsertUpdateDelete;
     }
+
+    /**
+     * @var int
+     */
+    private $apiLimitInsertUpdateDelete;
 
     /**
      * @param AbstractZohoDao $zohoDao
@@ -112,6 +119,17 @@ class ZohoDatabasePusher
                 $zohoBeans[$row['uid']] = $zohoBean;
                 $rowsDeleted[] = $row['uid'];
             }
+        }
+        $countItems = count($zohoBeans);
+
+        //@see https://www.zoho.com/crm/help/api/api-limits.html
+        //To optimize your API usage, get maximum 200 records with each request and insert, update or delete maximum 100 records with each request.
+        $offsetTodo = 0;
+        $doneBeans = 0;
+        while($doneBeans < $countItems){
+            $zohoBeansToSend = array_slice($zohoBeans,$offsetTodo,$this->apiLimitInsertUpdateDelete,true);
+            $offsetTodo += $this->apiLimitInsertUpdateDelete;
+            $doneBeans += count($zohoBeansToSend);
         }
         $zohoDao->save($zohoBeans);
         if (!$update) {
