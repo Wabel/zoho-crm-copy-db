@@ -97,7 +97,8 @@ class ZohoDatabasePusher
         ->where('l.table_name=:table_name')
         ->setParameters([
             'table_name' => $tableName,
-        ]);
+        ])
+        ;
         $results = $statement->execute();
         /* @var $zohoBeans ZohoBeanInterface[] */
         $zohoBeans = array();
@@ -131,9 +132,22 @@ class ZohoDatabasePusher
         $doneBeans = 0;
         while($doneBeans < $countItems){
             $zohoBeansToSend = array_slice($zohoBeans,$offsetTodo,$this->apiLimitInsertUpdateDelete,true);
+            $finalRowsDeleted = array_keys($zohoBeansToSend);
+            $this->sendDataToZohoCleanLocal($zohoDao,$zohoBeans,$finalRowsDeleted,$update);
             $offsetTodo += $this->apiLimitInsertUpdateDelete;
             $doneBeans += count($zohoBeansToSend);
         }
+    }
+
+    /**
+     * @param AbstractZohoDao $zohoDao
+     * @param ZohoBeanInterface[] $zohoBeans
+     * @param string[] $rowsDeleted
+     * @param bool $update
+     */
+    private function sendDataToZohoCleanLocal(AbstractZohoDao $zohoDao, array $zohoBeans,$rowsDeleted, $update = false)
+    {
+        $tableName = ZohoDatabaseHelper::getTableName($zohoDao, $this->prefix);
         $zohoDao->save($zohoBeans);
         if (!$update) {
             foreach ($zohoBeans as $uid => $zohoBean) {
@@ -156,10 +170,10 @@ class ZohoDatabasePusher
         } else {
             $this->connection->executeUpdate('delete from local_update where uid in ( :rowsDeleted)',
                 [
-                'rowsDeleted' => $rowsDeleted,
+                    'rowsDeleted' => $rowsDeleted,
                 ],
                 [
-                'rowsDeleted' => Connection::PARAM_INT_ARRAY,
+                    'rowsDeleted' => Connection::PARAM_INT_ARRAY,
                 ]
             );
         }
