@@ -73,6 +73,11 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private $usersResponse;
 
+    /**
+     * @var string[]
+     */
+    private $excludedZohoDao;
+
 
     /**
      * @param ZohoDatabaseModelSync $zohoDatabaseModelSync
@@ -84,10 +89,11 @@ class ZohoSyncDatabaseCommand extends Command
      * @param string $namespaceZohoDaos Daos namespace
      * @param MultiLogger $logger
      * @param Lock                  $lock                  A lock that can be used to avoid running the same command (copy) twice at the same time
+     * @param string[] $excludedZohoDao To exclude Dao and or solve Dao which can create ZohoResponse Error
      */
     public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync,
         EntitiesGeneratorService $zohoEntitiesGenerator, ZohoClient $zohoClient,
-        $pathZohoDaos, $namespaceZohoDaos, MultiLogger $logger, Lock $lock = null)
+        $pathZohoDaos, $namespaceZohoDaos, MultiLogger $logger, Lock $lock = null, $excludedZohoDao = [])
     {
         parent::__construct();
         $this->zohoDatabaseModelSync = $zohoDatabaseModelSync;
@@ -99,6 +105,7 @@ class ZohoSyncDatabaseCommand extends Command
         $this->namespaceZohoDaos = $namespaceZohoDaos;
         $this->logger = $logger;
         $this->lock = $lock;
+        $this->excludedZohoDao = $excludedZohoDao;
     }
 
     protected function configure()
@@ -191,7 +198,7 @@ class ZohoSyncDatabaseCommand extends Command
 
         return $fieldNames;
     }
-    
+
     /**
      * Regerate Zoho Daos
      * @param InputInterface $input
@@ -204,8 +211,9 @@ class ZohoSyncDatabaseCommand extends Command
         foreach ($zohoModules as $daoFullClassName) {
             /* @var $zohoDao AbstractZohoDao */
             $zohoDao = new $daoFullClassName($this->zohoClient);
-            //To have more module which is use time of modification (createdTime or lastActivityTime.
-            if (!in_array('createdTime', $this->getListFieldName($zohoDao))) {
+            //To have more module which is use time of modification (createdTime or lastActivityTime).
+            //use an array of Excluded Dao by full namespace
+            if (($this->excludedZohoDao && in_array(get_class($zohoDao),$this->excludedZohoDao)) || !in_array('createdTime', $this->getListFieldName($zohoDao))) {
                 continue;
             }
             $this->zohoDaos [] = $zohoDao;
