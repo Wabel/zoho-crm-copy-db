@@ -87,12 +87,18 @@ class ZohoDatabasePusher
         $fieldsMatching = $this->findMethodValues($zohoDao);
         $tableName = ZohoDatabaseHelper::getTableName($zohoDao, $this->prefix);
         $rowsDeleted = [];
+        $statementLimiter = $this->connection->createQueryBuilder();
+        //@see https://www.zoho.com/crm/help/api/api-limits.html
+        //To optimize your API usage, get maximum 200 records with each request and insert, update or delete maximum 100 records with each request.
+        $statementLimiter->select('DISTINCT table_name,uid')
+            ->from($localTable)->setMaxResults($this->apiLimitInsertUpdateDelete);
         $statement = $this->connection->createQueryBuilder();
         $statement->select('zcrm.*');
         if ($update) {
             $statement->addSelect('l.field_name as updated_fieldname');
         }
         $statement->from($localTable, 'l')
+        ->join('l','('.$statementLimiter->getSQL().')','ll','ll.table_name = l.table_name and  ll.uid = l.uid')
         ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
         ->where('l.table_name=:table_name')
         ->setParameters([
@@ -124,19 +130,7 @@ class ZohoDatabasePusher
                 $rowsDeleted[] = $row['uid'];
             }
         }
-        $countItems = count($zohoBeans);
-
-        //@see https://www.zoho.com/crm/help/api/api-limits.html
-        //To optimize your API usage, get maximum 200 records with each request and insert, update or delete maximum 100 records with each request.
-        $offsetTodo = 0;
-        $doneBeans = 0;
-        while($doneBeans < $countItems){
-            $zohoBeansToSend = array_slice($zohoBeans,$offsetTodo,$this->apiLimitInsertUpdateDelete,true);
-            $finalRowsDeleted = array_keys($zohoBeansToSend);
-            $this->sendDataToZohoCleanLocal($zohoDao,$zohoBeans,$finalRowsDeleted,$update);
-            $offsetTodo += $this->apiLimitInsertUpdateDelete;
-            $doneBeans += count($zohoBeansToSend);
-        }
+        $this->sendDataToZohoCleanLocal($zohoDao,$zohoBeans,$rowsDeleted,$update);
     }
 
     /**
