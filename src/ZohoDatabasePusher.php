@@ -132,7 +132,7 @@ class ZohoDatabasePusher
                 }
             }
             $this->sendDataToZohoCleanLocal($zohoDao,$zohoBeans,$rowsDeleted,$update);
-            $countElementToPush = $this->connection->executeQuery('select DISTINCT table_name,uid from '.$tableName)->rowCount();
+            $countElementToPush = $this->connection->executeQuery('select DISTINCT table_name,uid from '.$localTable)->rowCount();
         } while($countElementToPush > 0);
     }
 
