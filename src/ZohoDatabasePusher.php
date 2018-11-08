@@ -89,52 +89,48 @@ class ZohoDatabasePusher
         $rowsDeleted = [];
         //@see https://www.zoho.com/crm/help/api/api-limits.html
         //To optimize your API usage, get maximum 200 records with each request and insert, update or delete maximum 100 records with each request.
-        do{
-            $statementLimiter = $this->connection->createQueryBuilder();
-            $statementLimiter->select('DISTINCT table_name,uid')
-                ->from($localTable)->setMaxResults($this->apiLimitInsertUpdateDelete);
-            $statement = $this->connection->createQueryBuilder();
-            $statement->select('zcrm.*');
-            if ($update) {
-                $statement->addSelect('l.field_name as updated_fieldname');
+        $statementLimiter = $this->connection->createQueryBuilder();
+        $statementLimiter->select('DISTINCT table_name,uid')
+            ->from($localTable)->setMaxResults($this->apiLimitInsertUpdateDelete);
+        $statement = $this->connection->createQueryBuilder();
+        $statement->select('zcrm.*');
+        if ($update) {
+            $statement->addSelect('l.field_name as updated_fieldname');
+        }
+        $statement->from($localTable, 'l')
+            ->join('l','('.$statementLimiter->getSQL().')','ll','ll.table_name = l.table_name and  ll.uid = l.uid')
+            ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
+            ->where('l.table_name=:table_name')
+            ->setParameters([
+                'table_name' => $tableName,
+            ])
+        ;
+        $results = $statement->execute();
+        /* @var $zohoBeans ZohoBeanInterface[] */
+        $zohoBeans = array();
+        while ($row = $results->fetch()) {
+            $beanClassName = $zohoDao->getBeanClassName();
+            /* @var $zohoBean ZohoBeanInterface */
+            if (isset($zohoBeans[$row['uid']])) {
+                $zohoBean = $zohoBeans[$row['uid']];
+            } else {
+                $zohoBean = new $beanClassName();
             }
-            $statement->from($localTable, 'l')
-                ->join('l','('.$statementLimiter->getSQL().')','ll','ll.table_name = l.table_name and  ll.uid = l.uid')
-                ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
-                ->where('l.table_name=:table_name')
-                ->setParameters([
-                    'table_name' => $tableName,
-                ])
-            ;
-            $results = $statement->execute();
-            /* @var $zohoBeans ZohoBeanInterface[] */
-            $zohoBeans = array();
-            while ($row = $results->fetch()) {
-                $beanClassName = $zohoDao->getBeanClassName();
-                /* @var $zohoBean ZohoBeanInterface */
-                if (isset($zohoBeans[$row['uid']])) {
-                    $zohoBean = $zohoBeans[$row['uid']];
-                } else {
-                    $zohoBean = new $beanClassName();
-                }
 
-                if (!$update) {
-                    $this->insertDataZohoBean($zohoBean, $fieldsMatching, $row);
-                    $zohoBeans[$row['uid']] = $zohoBean;
-                    $rowsDeleted[] = $row['uid'];
-                }
-                if ($update && isset($row['updated_fieldname'])) {
-                    $columnName = $row['updated_fieldname'];
-                    $zohoBean->getZohoId() ?: $zohoBean->setZohoId($row['id']);
-                    $this->updateDataZohoBean($zohoBean, $fieldsMatching, $columnName, $row[$columnName]);
-                    $zohoBeans[$row['uid']] = $zohoBean;
-                    $rowsDeleted[] = $row['uid'];
-                }
+            if (!$update) {
+                $this->insertDataZohoBean($zohoBean, $fieldsMatching, $row);
+                $zohoBeans[$row['uid']] = $zohoBean;
+                $rowsDeleted[] = $row['uid'];
             }
-            $this->sendDataToZohoCleanLocal($zohoDao,$zohoBeans,$rowsDeleted,$update);
-            $statementElement = $this->connection->createQueryBuilder();
-            $countElementToPush =  $statementElement->select('*')->from($localTable)->execute()->rowCount();
-        } while($countElementToPush > 0);
+            if ($update && isset($row['updated_fieldname'])) {
+                $columnName = $row['updated_fieldname'];
+                $zohoBean->getZohoId() ?: $zohoBean->setZohoId($row['id']);
+                $this->updateDataZohoBean($zohoBean, $fieldsMatching, $columnName, $row[$columnName]);
+                $zohoBeans[$row['uid']] = $zohoBean;
+                $rowsDeleted[] = $row['uid'];
+            }
+        }
+        $this->sendDataToZohoCleanLocal($zohoDao,$zohoBeans,$rowsDeleted,$update);
     }
 
     /**
