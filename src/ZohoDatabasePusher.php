@@ -158,7 +158,7 @@ class ZohoDatabasePusher
     private function sendDataToZohoCleanLocal(AbstractZohoDao $zohoDao, array $zohoBeans,$rowsDeleted, $update = false)
     {
         $tableName = ZohoDatabaseHelper::getTableName($zohoDao, $this->prefix);
-//        $zohoDao->save($zohoBeans);
+        $zohoDao->save($zohoBeans);
         if (!$update) {
             foreach ($zohoBeans as $uid => $zohoBean) {
                 $countResult = (int) $this->connection->fetchColumn('select count(id) from '.$tableName.' where id = :id', ['id'=>$zohoBean->getZohoId()]);
