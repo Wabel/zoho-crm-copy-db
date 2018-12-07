@@ -116,7 +116,8 @@ class ZohoSyncDatabaseCommand extends Command
             ->addOption('reset', 'r', InputOption::VALUE_NONE, 'Get a fresh copy of Zoho (rather than doing incremental copy)')
             ->addOption('skip-trigger', 's', InputOption::VALUE_NONE, 'Do not create or update the trigger')
             ->addOption('fetch-only', 'f', InputOption::VALUE_NONE, 'Fetch only the Zoho data in local database')
-            ->addOption('push-only', 'p', InputOption::VALUE_NONE, 'Push only the local data to Zoho');
+            ->addOption('push-only', 'p', InputOption::VALUE_NONE, 'Push only the local data to Zoho')
+            ->addOption('limit', 'l', InputOption::VALUE_NONE, 'use defined memory limit or unlimited memory limit');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -124,6 +125,10 @@ class ZohoSyncDatabaseCommand extends Command
         try {
             if ($this->lock) {
                 $this->lock->acquireLock();
+            }
+
+            if(!$input->getOption('limit')){
+                ini_set('memory_limit','-1');
             }
             
             $this->logger->addLogger(new DateTimeFormatter(new ConsoleLogger($output)));
