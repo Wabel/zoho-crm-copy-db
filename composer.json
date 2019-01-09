@@ -20,12 +20,6 @@
 		"mouf/utils.log.psr.multi-logger": "^1.0",
 		"logger/essentials" : "^0.1.9"
 	},
-	"repositories": [
-		{
-			"type": "vcs",
-			"url": "https://github.com/rbergDrox/zoho-crm-orm"
-		}
-	],
     "require-dev" : {
 	  "phpunit/phpunit": "~4.0",
 	  "satooshi/php-coveralls": "~1.0"
