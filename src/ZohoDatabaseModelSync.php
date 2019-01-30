@@ -178,12 +178,14 @@ class ZohoDatabaseModelSync
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
         $hasChanges = $dbalTableDiffService->createOrUpdateTable($table);
-        $this->localChangesTracker->createUuidInsertTrigger($table);
 
-        if ($twoWaysSync && ($hasChanges || !$skipCreateTrigger)) {
-            $this->localChangesTracker->createInsertTrigger($table);
-            $this->localChangesTracker->createDeleteTrigger($table);
-            $this->localChangesTracker->createUpdateTrigger($table);
+        if ($hasChanges || !$skipCreateTrigger) {
+            $this->localChangesTracker->createUuidInsertTrigger($table);
+            if ($twoWaysSync) {
+                $this->localChangesTracker->createInsertTrigger($table);
+                $this->localChangesTracker->createDeleteTrigger($table);
+                $this->localChangesTracker->createUpdateTrigger($table);
+            }
         }
     }
 
