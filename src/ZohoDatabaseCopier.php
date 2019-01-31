@@ -67,45 +67,63 @@ class ZohoDatabaseCopier
      */
     public function fetchUserFromZoho()
     {
-        $userResponse = $this->zohoUserService->getUsers();
+        $users = $this->zohoUserService->getUsers();
         $tableName = 'users';
         $this->logger->notice("Copying FULL data users for '$tableName'");
-        $records = $userResponse->getRecords();
-        $this->logger->info('Fetched '.count($records).' records');
+        $this->logger->info('Fetched '.count($users).' records');
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
         
         $select = $this->connection->prepare('SELECT * FROM '.$tableName.' WHERE id = :id');
 
         $this->connection->beginTransaction();
-        foreach ($records as $record) {
+        foreach ($users as $user) {
             $data = [];
             $types = [];
             foreach ($table->getColumns() as $column) {
-                if (in_array($column->getName(), ['id'])) {
+                if ($column->getName() === 'id') {
                     continue;
                 } else {
-                    $data[$column->getName()] = $record[$column->getName()];
-                    $types[$column->getName()] = $column->getType()->getName();
+                    $fieldMethod = ZohoDatabaseHelper::getUserMethodNameFromField($column->getName());
+                    if (method_exists($user, $fieldMethod)
+                        && (!is_array($user->{$fieldMethod}()) && !is_object($user->{$fieldMethod}()))) {
+                        $data[$column->getName()] = $user->{$fieldMethod}();
+                    } elseif (method_exists($user, $fieldMethod)
+                        && is_array($user->{$fieldMethod}())
+                            && array_key_exists('name',$user->{$fieldMethod}())
+                            && array_key_exists('id',$user->{$fieldMethod}())) {
+                        $data[$column->getName()] = $user->{$fieldMethod}()['name'];
+                    }
+                    elseif (method_exists($user, $fieldMethod)
+                        && is_object($user->{$fieldMethod}()) && method_exists($user->{$fieldMethod}(),'getName')) {
+                        $object = $user->{$fieldMethod}();
+                        $data[$column->getName()] = $object->getName();
+                    }
+                    elseif($column->getName() === 'Currency'){
+                        //Todo: Do a pull request about \ZCRMUser::geCurrency() to \ZCRMUser::getCurrency()
+                        $data[$column->getName()] = $user->geCurrency();
+                    }
+                    else {
+                        continue;
+                    }
                 }
             }
-
-            $select->execute(['id' => $record['id']]);
+            $select->execute(['id' => $user->getId()]);
             $result = $select->fetch(\PDO::FETCH_ASSOC);
-            if ($result === false) {
-                $this->logger->debug("Inserting record with ID '".$record['id']."'.");
+            if ($result === false && $data) {
+                $this->logger->debug("Inserting record with ID '" . $user->getId() . "'.");
 
-                $data['id'] = $record['id'];
+                $data['id'] = $user->getId();
                 $types['id'] = 'string';
 
                 $this->connection->insert($tableName, $data, $types);
-            } else {
-                $this->logger->debug("Updating record with ID '".$record['id']."'.");
-                $identifier = ['id' => $record['id']];
+            } elseif($data) {
+                $this->logger->debug("Updating record with ID '" . $user->getId() . "'.");
+                $identifier = ['id' => $user->getId()];
                 $types['id'] = 'string';
-
                 $this->connection->update($tableName, $data, $identifier, $types);
             }
+
         }
         $this->connection->commit();
     }
@@ -125,38 +143,34 @@ class ZohoDatabaseCopier
 
         if ($incrementalSync) {
             $this->logger->info("Copying incremental data for '$tableName'");
-            /////'SHOW COLUMNS FROM '.$tableName.' LIKE `lastActivityTime`');
             // Let's get the last modification date:
             $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
-            //We use createdTime instead of lastActivityTime when the field doesn't exist in order to follow changes.
-            if($tableDetail->hasColumn('lastActivityTime')){
-                $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(lastActivityTime) FROM '.$tableName);
-            } else{
+            $lastActivityTime = null;
+            if($tableDetail->hasColumn('modifiedTime')){
+                $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM '.$tableName);
+            }
+            if(!$lastActivityTime && $tableDetail->hasColumn('createdTime'))
+            {
                 $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM '.$tableName);
             }
+
             if ($lastActivityTime !== null) {
                 $lastActivityTime = new \DateTime($lastActivityTime);
-                $this->logger->info('Last activity time: '.$lastActivityTime->format('c'));
+                $this->logger->info('Last modified time: '.$lastActivityTime->format('c'));
                 // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
                 $lastActivityTime->add(new \DateInterval('PT1S'));
             }
 
-            $records = $dao->getRecords(null, null, $lastActivityTime);
-            $deletedRecordIds = $dao->getDeletedRecordIds($lastActivityTime);
+            $records = $dao->getRecords(null, null,null, $lastActivityTime);
+            $deletedRecords = $dao->getDeletedRecordIds($lastActivityTime);
         } else {
             $this->logger->notice("Copying FULL data for '$tableName'");
             $records = $dao->getRecords();
-            $deletedRecordIds = [];
+            $deletedRecords = [];
         }
         $this->logger->info('Fetched '.count($records).' records');
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
-
-        $flatFields = ZohoDatabaseHelper::getFlatFields($dao->getFields());
-        $fieldsByName = [];
-        foreach ($flatFields as $field) {
-            $fieldsByName[$field['name']] = $field;
-        }
 
         $select = $this->connection->prepare('SELECT * FROM '.$tableName.' WHERE id = :id');
 
@@ -169,9 +183,13 @@ class ZohoDatabaseCopier
                 if (in_array($column->getName(), ['id', 'uid'])) {
                     continue;
                 } else {
-                    $field = $fieldsByName[$column->getName()];
-                    $getterName = $field['getter'];
-                    $data[$column->getName()] = $record->$getterName();
+                    $field = $dao->getFieldFromFieldName($column->getName());
+                    if(!$field){
+                        continue;
+                    }
+                    $getterName = $field->getGetter();
+                    $dataValue = $record->$getterName();
+                    $data[$column->getName()] = is_array($dataValue) ? implode(';', $dataValue) : $dataValue;
                     $types[$column->getName()] = $column->getType()->getName();
                 }
             }
@@ -204,16 +222,17 @@ class ZohoDatabaseCopier
             }
         }
         $sqlStatementUid = 'select uid from '.$this->connection->quoteIdentifier($tableName).' where id = :id';
-        foreach ($deletedRecordIds as $id) {
-            $uid = $this->connection->fetchColumn($sqlStatementUid, ['id' => $id]);
-            $this->connection->delete($tableName, ['id' => $id]);
+        foreach ($deletedRecords as $deletedRecord) {
+            $uid = $this->connection->fetchColumn($sqlStatementUid, ['id' => $deletedRecord->getEntityId()]);
+            $this->connection->delete($tableName, ['id' => $deletedRecord->getEntityId()]);
             if ($twoWaysSync) {
                 // TODO: we could detect if there are changes to be updated to the server and try to warn with a log message
                 // Also, let's remove the newly created field (because of the trigger) to avoid looping back to Zoho
-                $this->connection->delete('local_delete', ['table_name' => $tableName, 'id' => $id]);
+                $this->connection->delete('local_delete', ['table_name' => $tableName, 'id' => $deletedRecord->getEntityId()]);
                 $this->connection->delete('local_update', ['table_name' => $tableName, 'uid' => $uid]);
             }
         }
+        $this->logger->info('Deleted '.count($deletedRecords).' records');
 
         $this->connection->commit();
     }

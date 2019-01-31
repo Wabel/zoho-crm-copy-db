@@ -34,4 +34,14 @@ class ZohoDatabaseHelper
 
         return $flatFields;
     }
+
+    /**
+     * @param string $fieldName
+     * @return string
+     */
+    public static function getUserMethodNameFromField(string $fieldName)
+    {
+        return 'get'.ucfirst(s($fieldName)->camelize());
+
+    }
 }

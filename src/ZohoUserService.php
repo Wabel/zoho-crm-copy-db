@@ -17,26 +17,16 @@ class ZohoUserService
      */
     private $zohoClient;
 
-    /**
-     * @var Response
-     */
-    private $usersResponse;
-
     public function __construct(ZohoClient $zohoClient)
     {
         $this->zohoClient = $zohoClient;
     }
 
     /**
-     * @return Response
+     * @return \ZCRMUser[]
      */
     public function getUsers()
     {
-        if ($this->usersResponse !== null) {
-            return $this->usersResponse;
-        }
-
-        $this->usersResponse = $this->zohoClient->getUsers();
-        return $this->usersResponse;
+        return $this->zohoClient->getUsers();
     }
 }

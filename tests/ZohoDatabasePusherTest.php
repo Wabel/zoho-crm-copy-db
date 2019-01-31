@@ -15,8 +15,24 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
      */
     protected $dbConnection;
 
+    /**
+     * @var ZohoClient
+     */
+    private $zohoClient;
+
     protected function setUp()
     {
+        $this->zohoClient  = new ZohoClient(
+            [
+                'client_id' => getenv('client_id'),
+                'client_secret' => getenv('client_secret'),
+                'redirect_uri' => getenv('redirect_uri'),
+                'currentUserEmail' => getenv('currentUserEmail'),
+                'applicationLogFilePath' => getenv('applicationLogFilePath'),
+                'persistence_handler_class' => getenv('persistence_handler_class'),
+                'token_persistence_path' => getenv('token_persistence_path'),
+            ]
+        );
         $config = new \Doctrine\DBAL\Configuration();
         $connectionParams = array(
             'user' => $GLOBALS['db_username'],
@@ -29,17 +45,12 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
         $this->dbConnection = DriverManager::getConnection($connectionParams, $config);
     }
 
-    public function getZohoClient()
-    {
-        return new ZohoClient($GLOBALS['auth_token']);
-    }
-
     /**
      * @depends Wabel\Zoho\CRM\Copy\ZohoDatabaseCopierTest::testFetch
      */
     public function testSync()
     {
-        $contactZohoDao = new ContactZohoDao($this->getZohoClient());
+        $contactZohoDao = new ContactZohoDao($this->zohoClient);
         $zohoZync = new ZohoDatabasePusher($this->dbConnection);
         $tableName = 'zoho_contacts';
         $this->assertTrue($this->dbConnection->getSchemaManager()->tablesExist($tableName));
