@@ -139,6 +139,7 @@ class ZohoDatabaseModelSync
                     break;
                 case 'Phone':
                 case 'Auto Number':
+                case 'AutoNumber':
                 case 'Text':
                 case 'URL':
                 case 'Email':
