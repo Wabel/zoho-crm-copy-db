@@ -84,7 +84,6 @@ class ZohoDatabaseModelSync
         $schema = new Schema();
         $table = $schema->createTable($tableName);
 
-//        $flatFields = ZohoDatabaseHelper::getFlatFields($dao->getFields());
         //@Temporary fix to use Mysql5.7 not strict
         $table->addColumn('uid', 'string', ['length' => 36,'notnull'=>false]);
         $table->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
@@ -152,8 +151,10 @@ class ZohoDatabaseModelSync
                 case 'multiselectpicklist':
                     $type = 'text';
                     break;
-                case 'double':
                 case 'percent':
+                    $type = 'integer';
+                    break;
+                case 'double':
                     $type = 'float';
                     break;
                 case 'autonumber':
@@ -183,7 +184,6 @@ class ZohoDatabaseModelSync
                 $options['length'] = $length;
             }
 
-            //$options['notnull'] = $field['req'];
             $options['notnull'] = false;
 
             $table->addColumn($columnName, $type, $options);

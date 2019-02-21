@@ -6,6 +6,7 @@ use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
+use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 use Wabel\Zoho\CRM\ZohoBeanInterface;
 
 /**
@@ -124,7 +125,9 @@ class ZohoDatabasePusher
                     $rowsDeleted[] = $row['uid'];
                 }
             }
-            $this->sendDataToZohoCleanLocal($zohoDao,$zohoBeans,$rowsDeleted,$update);
+            if($zohoBeans){
+                $this->sendDataToZohoCleanLocal($zohoDao,$zohoBeans,$rowsDeleted,$update);
+            }
             $countToPush = $this->countElementInTable($zohoDao,$update);
         } while($countToPush > 0);
     }
@@ -179,7 +182,8 @@ class ZohoDatabasePusher
     {
         foreach ($row as $columnName => $columnValue) {
             $fieldMethod = $dao->getFieldFromFieldName($columnName);
-            if($fieldMethod && (!in_array($columnName, ['id', 'uid'])) && !is_null($columnValue)) {
+            if(!in_array($columnName, EntitiesGeneratorService::$defaultDateFields) && $fieldMethod
+                && (!in_array($columnName, ['id', 'uid'])) && !is_null($columnValue)) {
                 $type = $fieldMethod->getType();
                 $value = $this->formatValueToBeans($type, $columnValue);
                 $setterMethod = $fieldMethod->getSetter();
@@ -199,7 +203,8 @@ class ZohoDatabasePusher
     private function updateDataZohoBean(AbstractZohoDao $dao, ZohoBeanInterface $zohoBean, $columnName, $valueDb)
     {
         $fieldMethod = $dao->getFieldFromFieldName($columnName);
-        if ($fieldMethod && !in_array($columnName, ['id', 'uid'])) {
+        if (!in_array($columnName, EntitiesGeneratorService::$defaultDateFields) && $fieldMethod
+            && !in_array($columnName, ['id', 'uid'])) {
             $type = $fieldMethod->getType();
             $value = is_null($valueDb) ? $valueDb : $this->formatValueToBeans($type, $valueDb);
             $setterMethod = $fieldMethod->getSetter();
@@ -219,10 +224,19 @@ class ZohoDatabasePusher
     {
         switch ($type) {
             case 'date':
-                $value = \DateTime::createFromFormat('Y-m-d', $value);
+                $value = \DateTime::createFromFormat('Y-m-d', $value)?:null;
                 break;
             case 'datetime':
-                $value = \DateTime::createFromFormat('Y-m-d H:i:s', $value);
+                $value = \DateTime::createFromFormat('Y-m-d H:i:s', $value)?:null;
+                break;
+            case 'boolean' :
+                $value = (bool) $value;
+                break;
+            case 'percent' :
+                $value = (int) $value;
+                break;
+            case 'double' :
+                $value = number_format($value, 2);
                 break;
             case 'multiselectlookup':
             case 'multiuserlookup':

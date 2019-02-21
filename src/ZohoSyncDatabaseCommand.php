@@ -274,7 +274,9 @@ class ZohoSyncDatabaseCommand extends Command
     {
         $output->writeln('Starting synchronize Zoho data into Zoho CRM.');
         foreach ($this->zohoDaos as $zohoDao) {
-            $this->zohoDatabaseSync->pushToZoho($zohoDao);
+            if($zohoDao->getFieldFromFieldName('createdTime')){
+                $this->zohoDatabaseSync->pushToZoho($zohoDao);
+            }
         }
         $output->writeln('Zoho data successfully synchronized.');
     }

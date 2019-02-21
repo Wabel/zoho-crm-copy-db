@@ -156,9 +156,12 @@ class ZohoDatabaseCopier
 
             if ($lastActivityTime !== null) {
                 $lastActivityTime = new \DateTime($lastActivityTime);
-                $this->logger->info('Last modified time: '.$lastActivityTime->format('c'));
+                $lastActivityTime->setTimezone(new \DateTimeZone($dao->getZohoClient()->getTimezone()));
+                $this->logger->info('Last modified time: '.$lastActivityTime->format(\DateTime::ATOM));
                 // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
-                $lastActivityTime->add(new \DateInterval('PT1S'));
+//                $lastActivityTime->add(new \DateInterval('PT1S'));
+//                $lastActivityTime->sub(new \DateInterval('PT1H'));
+                $lastActivityTime->sub(new \DateInterval('PT1H'));
             }
 
             $records = $dao->getRecords(null, null,null, $lastActivityTime);
