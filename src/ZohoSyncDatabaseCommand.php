@@ -218,9 +218,9 @@ class ZohoSyncDatabaseCommand extends Command
             $zohoDao = new $daoFullClassName($this->zohoClient);
             //To have more module which is use time of modification (createdTime or lastActivityTime).
             //use an array of Excluded Dao by full namespace
-//            if (($this->excludedZohoDao && in_array(get_class($zohoDao),$this->excludedZohoDao))) {
-//                continue;
-//            }
+            if (($this->excludedZohoDao && in_array(get_class($zohoDao),$this->excludedZohoDao))) {
+                continue;
+            }
             $this->zohoDaos [] = $zohoDao;
             $output->writeln(sprintf('<info>%s has created</info>', get_class($zohoDao)));
         }
