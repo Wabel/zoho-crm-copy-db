@@ -84,15 +84,14 @@ class ZohoDatabaseModelSync
         $schema = new Schema();
         $table = $schema->createTable($tableName);
 
-        $flatFields = ZohoDatabaseHelper::getFlatFields($dao->getFields());
         //@Temporary fix to use Mysql5.7 not strict
         $table->addColumn('uid', 'string', ['length' => 36,'notnull'=>false]);
         $table->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
         $table->addUniqueIndex(['id']);
         $table->setPrimaryKey(['uid']);
 
-        foreach ($flatFields as $field) {
-            $columnName = $field['name'];
+        foreach ($dao->getFields() as $field) {
+            $columnName = $field->getName();
             //It seems sometime we can have the same field twice in the list of fields from the API.
             if($table->hasColumn($columnName)){
                 continue;
@@ -100,80 +99,91 @@ class ZohoDatabaseModelSync
 
             $length = null;
             $index = false;
-
+            $options = [];
             // Note: full list of types available here: https://www.zoho.com/crm/help/customization/custom-fields.html
-            switch ($field['type']) {
-                case 'Lookup ID':
-                case 'Lookup':
+            switch ($field->getType()) {
+                case 'fileupload':
                     $type = 'string';
-                    $length = 100;
+                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 255;
+                    break;
+                case 'lookup':
+                    $type = 'string';
+                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 100;
                     $index = true;
                     break;
-                case 'OwnerLookup':
+                case 'userlookup':
+                case 'ownerlookup':
                     $type = 'string';
                     $index = true;
-                    $length = 25;
+                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 25;
                     break;
-                case 'Formula':
+                case 'formula':
                     // Note: a Formula can return any type, but we have no way to know which type it returns...
                     $type = 'string';
-                    $length = 100;
+                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 100;
                     break;
-                case 'DateTime':
+                case 'datetime':
                     $type = 'datetime';
                     break;
-                case 'Date':
+                case 'date':
                     $type = 'date';
                     break;
-                case 'DateTime':
-                    $type = 'datetime';
-                    break;
-                case 'Boolean':
+                case 'boolean':
                     $type = 'boolean';
                     break;
-                case 'TextArea':
+                case 'textarea':
                     $type = 'text';
                     break;
-                case 'BigInt':
+                case 'bigint':
                     $type = 'bigint';
                     break;
-                case 'Phone':
-                case 'Auto Number':
-                case 'AutoNumber':
-                case 'Text':
-                case 'URL':
-                case 'Email':
-                case 'Website':
-                case 'Pick List':
-                case 'Multiselect Pick List':
-                    // $field['maxlength'] is not enough
+                case 'phone':
+                case 'text':
+                case 'url':
+                case 'email':
+                case 'picklist':
+                case 'website':
+                    $type = 'string';
+                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 255;
+                    break;
+                case 'multiselectlookup':
+                case 'multiuserlookup':
+                case 'multiselectpicklist':
                     $type = 'text';
                     break;
-                case 'Double':
-                case 'Percent':
-                    $type = 'float';
-                    break;
-                case 'Integer':
+                case 'percent':
                     $type = 'integer';
                     break;
-                case 'Currency':
-                case 'Decimal':
-                    $type = 'decimal';
+                case 'double':
+                    $type = 'float';
                     break;
-                case 'ConsentLookup':
+                case 'autonumber':
+                case 'integer':
+                    $type = 'integer';
+                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 255;
+                    break;
+                case 'currency':
+                case 'decimal':
+                    $type = 'decimal';
+                    $options['scale'] = 2;
+                    break;
+                case 'consent_lookup':
+                case 'profileimage':
+                case 'ALARM':
+                case 'RRULE':
+                case 'event_reminder':
                     continue 2;
                     break;
                 default:
-                    throw new \RuntimeException('Unknown type "'.$field['type'].'"');
+                    throw new \RuntimeException('Unknown type "'.$field->getType().'"');
             }
 
-            $options = [];
+
 
             if ($length) {
                 $options['length'] = $length;
             }
 
-            //$options['notnull'] = $field['req'];
             $options['notnull'] = false;
 
             $table->addColumn($columnName, $type, $options);
@@ -185,7 +195,6 @@ class ZohoDatabaseModelSync
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
         $hasChanges = $dbalTableDiffService->createOrUpdateTable($table);
-
         if ($hasChanges || !$skipCreateTrigger) {
             $this->localChangesTracker->createUuidInsertTrigger($table);
             if ($twoWaysSync) {
@@ -194,21 +203,19 @@ class ZohoDatabaseModelSync
                 $this->localChangesTracker->createUpdateTrigger($table);
             }
         }
+
     }
 
     public function synchronizeUserDbModel()
     {
-        $users = $this->zohoUserService->getUsers();
         $tableName = 'users';
-
         $schema = new Schema();
         $table = $schema->createTable($tableName);
 
-        $flatFields = $users->getUserFields();
         $table->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
         $table->setPrimaryKey(['id']);
-        foreach ($flatFields as $field) {
-            if (in_array($field, ['id'])) {
+        foreach (\ZCRMUser::$defaultKeys as $field) {
+            if ($field === 'id') {
                 continue;
             }
             $columnName = $field;
@@ -241,7 +248,6 @@ class ZohoDatabaseModelSync
                 $options['length'] = $length;
             }
 
-            //$options['notnull'] = $field['req'];
             $options['notnull'] = false;
 
             $table->addColumn($columnName, $type, $options);

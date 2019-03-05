@@ -218,7 +218,7 @@ class ZohoSyncDatabaseCommand extends Command
             $zohoDao = new $daoFullClassName($this->zohoClient);
             //To have more module which is use time of modification (createdTime or lastActivityTime).
             //use an array of Excluded Dao by full namespace
-            if (($this->excludedZohoDao && in_array(get_class($zohoDao),$this->excludedZohoDao)) || !in_array('createdTime', $this->getListFieldName($zohoDao))) {
+            if (($this->excludedZohoDao && in_array(get_class($zohoDao),$this->excludedZohoDao))) {
                 continue;
             }
             $this->zohoDaos [] = $zohoDao;
@@ -274,7 +274,9 @@ class ZohoSyncDatabaseCommand extends Command
     {
         $output->writeln('Starting synchronize Zoho data into Zoho CRM.');
         foreach ($this->zohoDaos as $zohoDao) {
-            $this->zohoDatabaseSync->pushToZoho($zohoDao);
+            if($zohoDao->getFieldFromFieldName('createdTime')){
+                $this->zohoDatabaseSync->pushToZoho($zohoDao);
+            }
         }
         $output->writeln('Zoho data successfully synchronized.');
     }

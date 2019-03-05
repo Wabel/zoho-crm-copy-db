@@ -6,6 +6,7 @@ use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
+use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 use Wabel\Zoho\CRM\ZohoBeanInterface;
 
 /**
@@ -58,26 +59,6 @@ class ZohoDatabasePusher
 
     /**
      * @param AbstractZohoDao $zohoDao
-     *
-     * @return array
-     */
-    private function findMethodValues(AbstractZohoDao $zohoDao)
-    {
-        $fieldsMatching = array();
-        foreach ($zohoDao->getFields() as $fieldsDescriptor) {
-            foreach (array_values($fieldsDescriptor) as $fieldDescriptor) {
-                $fieldsMatching[$fieldDescriptor['name']] = [
-                    'setter' => $fieldDescriptor['setter'],
-                    'type' => $fieldDescriptor['type'],
-                ];
-            }
-        }
-
-        return $fieldsMatching;
-    }
-
-    /**
-     * @param AbstractZohoDao $zohoDao
      * @param bool $update
      * @return int
      */
@@ -97,11 +78,10 @@ class ZohoDatabasePusher
     public function pushDataToZoho(AbstractZohoDao $zohoDao, $update = false)
     {
         $localTable = $update ? 'local_update' : 'local_insert';
-        $fieldsMatching = $this->findMethodValues($zohoDao);
         $tableName = ZohoDatabaseHelper::getTableName($zohoDao, $this->prefix);
         do{
             $rowsDeleted = [];
-            //@see https://www.zoho.com/crm/help/api/api-limits.html
+            //@see https://www.zoho.com/crm/help/api/v2/#ra-update-records
             //To optimize your API usage, get maximum 200 records with each request and insert, update or delete maximum 100 records with each request.
             $statementLimiter = $this->connection->createQueryBuilder();
             $statementLimiter->select('DISTINCT table_name,uid')
@@ -123,28 +103,31 @@ class ZohoDatabasePusher
             /* @var $zohoBeans ZohoBeanInterface[] */
             $zohoBeans = array();
             while ($row = $results->fetch()) {
-                $beanClassName = $zohoDao->getBeanClassName();
+//                $beanClassName = $zohoDao->getBeanClassName();
                 /* @var $zohoBean ZohoBeanInterface */
                 if (isset($zohoBeans[$row['uid']])) {
                     $zohoBean = $zohoBeans[$row['uid']];
                 } else {
-                    $zohoBean = new $beanClassName();
+//                    $zohoBean = new $beanClassName();
+                    $zohoBean = $zohoDao->create();
                 }
 
                 if (!$update) {
-                    $this->insertDataZohoBean($zohoBean, $fieldsMatching, $row);
+                    $this->insertDataZohoBean($zohoDao, $zohoBean, $row);
                     $zohoBeans[$row['uid']] = $zohoBean;
                     $rowsDeleted[] = $row['uid'];
                 }
                 if ($update && isset($row['updated_fieldname'])) {
                     $columnName = $row['updated_fieldname'];
                     $zohoBean->getZohoId() ?: $zohoBean->setZohoId($row['id']);
-                    $this->updateDataZohoBean($zohoBean, $fieldsMatching, $columnName, $row[$columnName]);
+                    $this->updateDataZohoBean($zohoDao, $zohoBean, $columnName, $row[$columnName]);
                     $zohoBeans[$row['uid']] = $zohoBean;
                     $rowsDeleted[] = $row['uid'];
                 }
             }
-            $this->sendDataToZohoCleanLocal($zohoDao,$zohoBeans,$rowsDeleted,$update);
+            if($zohoBeans){
+                $this->sendDataToZohoCleanLocal($zohoDao,$zohoBeans,$rowsDeleted,$update);
+            }
             $countToPush = $this->countElementInTable($zohoDao,$update);
         } while($countToPush > 0);
     }
@@ -191,18 +174,20 @@ class ZohoDatabasePusher
 
     /**
      * Insert data to bean in order to insert zoho records.
-     *
+     * @param AbstractZohoDao $dao
      * @param ZohoBeanInterface $zohoBean
-     * @param array             $fieldsMatching
-     * @param array             $row
+     * @param array $row
      */
-    private function insertDataZohoBean(ZohoBeanInterface $zohoBean, array $fieldsMatching, array $row)
+    private function insertDataZohoBean(AbstractZohoDao $dao, ZohoBeanInterface $zohoBean, array $row)
     {
         foreach ($row as $columnName => $columnValue) {
-            if ((!in_array($columnName, ['id', 'uid']) || isset($fieldsMatching[$columnName])) && !is_null($columnValue)) {
-                $type = $fieldsMatching[$columnName]['type'];
+            $fieldMethod = $dao->getFieldFromFieldName($columnName);
+            if(!in_array($columnName, EntitiesGeneratorService::$defaultDateFields) && $fieldMethod
+                && (!in_array($columnName, ['id', 'uid'])) && !is_null($columnValue)) {
+                $type = $fieldMethod->getType();
                 $value = $this->formatValueToBeans($type, $columnValue);
-                $zohoBean->{$fieldsMatching[$columnName]['setter']}($value);
+                $setterMethod = $fieldMethod->getSetter();
+                $zohoBean->{$setterMethod}($value);
             }
         }
     }
@@ -215,12 +200,15 @@ class ZohoDatabasePusher
      * @param type              $columnName
      * @param type              $valueDb
      */
-    private function updateDataZohoBean(ZohoBeanInterface $zohoBean, array $fieldsMatching, $columnName, $valueDb)
+    private function updateDataZohoBean(AbstractZohoDao $dao, ZohoBeanInterface $zohoBean, $columnName, $valueDb)
     {
-        if (!in_array($columnName, ['id', 'uid']) || (isset($fieldsMatching[$columnName]))) {
-            $type = $fieldsMatching[$columnName]['type'];
+        $fieldMethod = $dao->getFieldFromFieldName($columnName);
+        if (!in_array($columnName, EntitiesGeneratorService::$defaultDateFields) && $fieldMethod
+            && !in_array($columnName, ['id', 'uid'])) {
+            $type = $fieldMethod->getType();
             $value = is_null($valueDb) ? $valueDb : $this->formatValueToBeans($type, $valueDb);
-            $zohoBean->{$fieldsMatching[$columnName]['setter']}($value);
+            $setterMethod = $fieldMethod->getSetter();
+            $zohoBean->{$setterMethod}($value);
         }
     }
 
@@ -235,11 +223,25 @@ class ZohoDatabasePusher
     private function formatValueToBeans($type, $value)
     {
         switch ($type) {
-            case 'Date':
-                $value = \DateTime::createFromFormat('Y-m-d', $value);
+            case 'date':
+                $value = \DateTime::createFromFormat('Y-m-d', $value)?:null;
                 break;
-            case 'DateTime':
-                $value = \DateTime::createFromFormat('Y-m-d H:i:s', $value);
+            case 'datetime':
+                $value = \DateTime::createFromFormat('Y-m-d H:i:s', $value)?:null;
+                break;
+            case 'boolean' :
+                $value = (bool) $value;
+                break;
+            case 'percent' :
+                $value = (int) $value;
+                break;
+            case 'double' :
+                $value = number_format($value, 2);
+                break;
+            case 'multiselectlookup':
+            case 'multiuserlookup':
+            case 'multiselectpicklist':
+                $value = explode(';',$value);
                 break;
         }
 

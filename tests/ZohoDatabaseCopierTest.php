@@ -15,8 +15,25 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
      */
     protected $dbConnection;
 
+    /**
+     * @var ZohoClient
+     */
+    private $zohoClient;
+
     protected function setUp()
     {
+        $this->zohoClient  = new ZohoClient(
+            [
+                'client_id' => getenv('client_id'),
+                'client_secret' => getenv('client_secret'),
+                'redirect_uri' => getenv('redirect_uri'),
+                'currentUserEmail' => getenv('currentUserEmail'),
+                'applicationLogFilePath' => getenv('applicationLogFilePath'),
+                'persistence_handler_class' => getenv('persistence_handler_class'),
+                'token_persistence_path' => getenv('token_persistence_path'),
+            ]
+        );
+
         $config = new \Doctrine\DBAL\Configuration();
         $connectionParams = array(
             'user' => $GLOBALS['db_username'],
@@ -29,14 +46,9 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
         $this->dbConnection = DriverManager::getConnection($connectionParams, $config);
     }
 
-    public function getZohoClient()
-    {
-        return new ZohoClient($GLOBALS['auth_token']);
-    }
-
     public function getZohoUserService()
     {
-        return new ZohoUserService($this->getZohoClient());
+        return new ZohoUserService($this->zohoClient);
     }
 
     /**
@@ -46,7 +58,7 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
     {
         $listener = new TestListener();
 
-        $contactZohoDao = new ContactZohoDao($this->getZohoClient());
+        $contactZohoDao = new ContactZohoDao($this->zohoClient);
 
         // Let's add a single user:
         $testContact = new Contact();

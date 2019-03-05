@@ -31,8 +31,24 @@ class ZohoDatabaseModelSyncTest extends \PHPUnit_Framework_TestCase
         $adminConn->getSchemaManager()->dropAndCreateDatabase($GLOBALS['db_name']);
     }
 
+    /**
+     * @var ZohoClient
+     */
+    private $zohoClient;
+
     protected function setUp()
     {
+        $this->zohoClient  = new ZohoClient(
+            [
+                'client_id' => getenv('client_id'),
+                'client_secret' => getenv('client_secret'),
+                'redirect_uri' => getenv('redirect_uri'),
+                'currentUserEmail' => getenv('currentUserEmail'),
+                'applicationLogFilePath' => getenv('applicationLogFilePath'),
+                'persistence_handler_class' => getenv('persistence_handler_class'),
+                'token_persistence_path' => getenv('token_persistence_path'),
+            ]
+        );
         $config = new \Doctrine\DBAL\Configuration();
         $connectionParams = array(
             'user' => $GLOBALS['db_username'],
@@ -45,19 +61,15 @@ class ZohoDatabaseModelSyncTest extends \PHPUnit_Framework_TestCase
         $this->dbConnection = DriverManager::getConnection($connectionParams, $config);
     }
 
-    public function getZohoClient()
-    {
-        return new ZohoClient($GLOBALS['auth_token']);
-    }
 
     public function getZohoUserService()
     {
-        return new ZohoUserService($this->getZohoClient());
+        return new ZohoUserService($this->zohoClient);
     }
 
     public function getEntitiesGeneratorService()
     {
-        return new EntitiesGeneratorService($this->getZohoClient(), new NullLogger());
+        return new EntitiesGeneratorService($this->zohoClient, new NullLogger());
     }
 
     public function testModelSync()
@@ -68,7 +80,7 @@ class ZohoDatabaseModelSyncTest extends \PHPUnit_Framework_TestCase
         require __DIR__.'/generated/Contact.php';
         require __DIR__.'/generated/ContactZohoDao.php';
 
-        $contactZohoDao = new ContactZohoDao($this->getZohoClient());
+        $contactZohoDao = new ContactZohoDao($this->zohoClient);
 
         $databaseModelSync = new ZohoDatabaseModelSync($this->dbConnection, $this->getZohoUserService(), 'zoho_');
 
