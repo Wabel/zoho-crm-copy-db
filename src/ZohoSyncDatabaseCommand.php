@@ -53,6 +53,7 @@ class ZohoSyncDatabaseCommand extends Command
 
     /**
      * The Zoho Dao and Beans generator
+     *
      * @var EntitiesGeneratorService
      */
     private $zohoEntitiesGenerator;
@@ -80,21 +81,21 @@ class ZohoSyncDatabaseCommand extends Command
 
 
     /**
-     * @param ZohoDatabaseModelSync $zohoDatabaseModelSync
-     * @param ZohoDatabaseCopier    $zohoDatabaseCopier
-     * @param ZohoDatabasePusher    $zohoDatabaseSync
+     * @param ZohoDatabaseModelSync    $zohoDatabaseModelSync
+     * @param ZohoDatabaseCopier       $zohoDatabaseCopier
+     * @param ZohoDatabasePusher       $zohoDatabaseSync
      * @param EntitiesGeneratorService $zohoEntitiesGenerator The Zoho Dao and Beans generator
-     * @param ZohoClient $zohoClient
-     * @param string $pathZohoDaos Tht path where we need to generate the Daos.
-     * @param string $namespaceZohoDaos Daos namespace
-     * @param MultiLogger $logger
-     * @param Lock                  $lock                  A lock that can be used to avoid running the same command (copy) twice at the same time
-     * @param string[] $excludedZohoDao To exclude Dao and or solve Dao which can create ZohoResponse Error
+     * @param ZohoClient               $zohoClient
+     * @param string                   $pathZohoDaos          Tht path where we need to generate the Daos.
+     * @param string                   $namespaceZohoDaos     Daos namespace
+     * @param MultiLogger              $logger
+     * @param Lock                     $lock                  A lock that can be used to avoid running the same command (copy) twice at the same time
+     * @param string[]                 $excludedZohoDao       To exclude Dao and or solve Dao which can create ZohoResponse Error
      */
     public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync,
         EntitiesGeneratorService $zohoEntitiesGenerator, ZohoClient $zohoClient,
-        $pathZohoDaos, $namespaceZohoDaos, MultiLogger $logger, Lock $lock = null, $excludedZohoDao = [])
-    {
+        $pathZohoDaos, $namespaceZohoDaos, MultiLogger $logger, Lock $lock = null, $excludedZohoDao = []
+    ) {
         parent::__construct();
         $this->zohoDatabaseModelSync = $zohoDatabaseModelSync;
         $this->zohoDatabaseCopier = $zohoDatabaseCopier;
@@ -127,8 +128,8 @@ class ZohoSyncDatabaseCommand extends Command
                 $this->lock->acquireLock();
             }
 
-            if(!$input->getOption('limit')){
-                ini_set('memory_limit','-1');
+            if(!$input->getOption('limit')) {
+                ini_set('memory_limit', '-1');
             }
             
             $this->logger->addLogger(new DateTimeFormatter(new ConsoleLogger($output)));
@@ -186,27 +187,10 @@ class ZohoSyncDatabaseCommand extends Command
         $output->writeln('Zoho users model successfully synchronized.');
     }
 
-
-    /**
-     * @param AbstractZohoDao $zohoDao
-     *
-     * @return array
-     */
-    private function getListFieldName(AbstractZohoDao $zohoDao)
-    {
-        $fieldNames= array();
-        foreach ($zohoDao->getFields() as $fieldsDescriptor) {
-            foreach (array_values($fieldsDescriptor) as $fieldDescriptor) {
-                $fieldNames[] = $fieldDescriptor['name'];
-            }
-        }
-
-        return $fieldNames;
-    }
-
     /**
      * Regerate Zoho Daos
-     * @param InputInterface $input
+     *
+     * @param InputInterface  $input
      * @param OutputInterface $output
      */
     private function regenerateZohoDao(OutputInterface $output)
@@ -218,7 +202,7 @@ class ZohoSyncDatabaseCommand extends Command
             $zohoDao = new $daoFullClassName($this->zohoClient);
             //To have more module which is use time of modification (createdTime or lastActivityTime).
             //use an array of Excluded Dao by full namespace
-            if (($this->excludedZohoDao && in_array(get_class($zohoDao),$this->excludedZohoDao))) {
+            if (($this->excludedZohoDao && in_array(get_class($zohoDao), $this->excludedZohoDao))) {
                 continue;
             }
             $this->zohoDaos [] = $zohoDao;
@@ -274,7 +258,7 @@ class ZohoSyncDatabaseCommand extends Command
     {
         $output->writeln('Starting synchronize Zoho data into Zoho CRM.');
         foreach ($this->zohoDaos as $zohoDao) {
-            if($zohoDao->getFieldFromFieldName('createdTime')){
+            if($zohoDao->getFieldFromFieldName('createdTime')) {
                 $this->zohoDatabaseSync->pushToZoho($zohoDao);
             }
         }

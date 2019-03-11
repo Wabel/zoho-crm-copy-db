@@ -93,7 +93,7 @@ class ZohoDatabaseModelSync
         foreach ($dao->getFields() as $field) {
             $columnName = $field->getName();
             //It seems sometime we can have the same field twice in the list of fields from the API.
-            if($table->hasColumn($columnName)){
+            if($table->hasColumn($columnName)) {
                 continue;
             }
 
@@ -102,80 +102,80 @@ class ZohoDatabaseModelSync
             $options = [];
             // Note: full list of types available here: https://www.zoho.com/crm/help/customization/custom-fields.html
             switch ($field->getType()) {
-                case 'fileupload':
-                    $type = 'string';
-                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 255;
+            case 'fileupload':
+                $type = 'string';
+                $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 255;
+                break;
+            case 'lookup':
+                $type = 'string';
+                $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 100;
+                $index = true;
+                break;
+            case 'userlookup':
+            case 'ownerlookup':
+                $type = 'string';
+                $index = true;
+                $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 25;
+                break;
+            case 'formula':
+                // Note: a Formula can return any type, but we have no way to know which type it returns...
+                $type = 'string';
+                $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 100;
+                break;
+            case 'datetime':
+                $type = 'datetime';
+                break;
+            case 'date':
+                $type = 'date';
+                break;
+            case 'boolean':
+                $type = 'boolean';
+                break;
+            case 'textarea':
+                $type = 'text';
+                break;
+            case 'bigint':
+                $type = 'bigint';
+                break;
+            case 'phone':
+            case 'text':
+            case 'url':
+            case 'email':
+            case 'picklist':
+            case 'website':
+                $type = 'string';
+                $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 255;
+                break;
+            case 'multiselectlookup':
+            case 'multiuserlookup':
+            case 'multiselectpicklist':
+                $type = 'text';
+                break;
+            case 'percent':
+                $type = 'integer';
+                break;
+            case 'double':
+                $type = 'float';
+                break;
+            case 'autonumber':
+            case 'integer':
+                $type = 'integer';
+                $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 255;
+                break;
+            case 'currency':
+            case 'decimal':
+                $type = 'decimal';
+                $options['scale'] = 2;
+                break;
+            case 'consent_lookup':
+            case 'profileimage':
+            case 'ALARM':
+            case 'RRULE':
+            case 'event_reminder':
+                continue 2;
                     break;
-                case 'lookup':
-                    $type = 'string';
-                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 100;
-                    $index = true;
-                    break;
-                case 'userlookup':
-                case 'ownerlookup':
-                    $type = 'string';
-                    $index = true;
-                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 25;
-                    break;
-                case 'formula':
-                    // Note: a Formula can return any type, but we have no way to know which type it returns...
-                    $type = 'string';
-                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 100;
-                    break;
-                case 'datetime':
-                    $type = 'datetime';
-                    break;
-                case 'date':
-                    $type = 'date';
-                    break;
-                case 'boolean':
-                    $type = 'boolean';
-                    break;
-                case 'textarea':
-                    $type = 'text';
-                    break;
-                case 'bigint':
-                    $type = 'bigint';
-                    break;
-                case 'phone':
-                case 'text':
-                case 'url':
-                case 'email':
-                case 'picklist':
-                case 'website':
-                    $type = 'string';
-                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 255;
-                    break;
-                case 'multiselectlookup':
-                case 'multiuserlookup':
-                case 'multiselectpicklist':
-                    $type = 'text';
-                    break;
-                case 'percent':
-                    $type = 'integer';
-                    break;
-                case 'double':
-                    $type = 'float';
-                    break;
-                case 'autonumber':
-                case 'integer':
-                    $type = 'integer';
-                    $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 255;
-                    break;
-                case 'currency':
-                case 'decimal':
-                    $type = 'decimal';
-                    $options['scale'] = 2;
-                    break;
-                case 'consent_lookup':
-                case 'profileimage':
-                case 'ALARM':
-                case 'RRULE':
-                case 'event_reminder':
-                    continue 2;
-                    break;
-                default:
-                    throw new \RuntimeException('Unknown type "'.$field->getType().'"');
+            default:
+                throw new \RuntimeException('Unknown type "'.$field->getType().'"');
             }
 
 
@@ -222,24 +222,24 @@ class ZohoDatabaseModelSync
             $length = null;
             $index = false;
             switch ($field) {
-                case 'zuid':
-                    $type = 'string';
-                    $length = 100;
-                    $index = true;
-                    break;
-                case 'name':
-                case 'email':
-                    $type = 'string';
-                    $length = 255;
-                    $index = true;
-                    break;
-                case 'phone':
-                case 'website':
-                    $type = 'text';
-                    break;
-                default:
-                    $type = 'string';
-                    $length = 100;
+            case 'zuid':
+                $type = 'string';
+                $length = 100;
+                $index = true;
+                break;
+            case 'name':
+            case 'email':
+                $type = 'string';
+                $length = 255;
+                $index = true;
+                break;
+            case 'phone':
+            case 'website':
+                $type = 'text';
+                break;
+            default:
+                $type = 'string';
+                $length = 100;
             }
 
             $options = [];

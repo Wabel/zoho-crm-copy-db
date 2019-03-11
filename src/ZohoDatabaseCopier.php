@@ -86,20 +86,23 @@ class ZohoDatabaseCopier
                 } else {
                     $fieldMethod = ZohoDatabaseHelper::getUserMethodNameFromField($column->getName());
                     if (method_exists($user, $fieldMethod)
-                        && (!is_array($user->{$fieldMethod}()) && !is_object($user->{$fieldMethod}()))) {
+                        && (!is_array($user->{$fieldMethod}()) && !is_object($user->{$fieldMethod}()))
+                    ) {
                         $data[$column->getName()] = $user->{$fieldMethod}();
                     } elseif (method_exists($user, $fieldMethod)
                         && is_array($user->{$fieldMethod}())
-                            && array_key_exists('name',$user->{$fieldMethod}())
-                            && array_key_exists('id',$user->{$fieldMethod}())) {
+                        && array_key_exists('name', $user->{$fieldMethod}())
+                        && array_key_exists('id', $user->{$fieldMethod}())
+                    ) {
                         $data[$column->getName()] = $user->{$fieldMethod}()['name'];
                     }
                     elseif (method_exists($user, $fieldMethod)
-                        && is_object($user->{$fieldMethod}()) && method_exists($user->{$fieldMethod}(),'getName')) {
+                        && is_object($user->{$fieldMethod}()) && method_exists($user->{$fieldMethod}(), 'getName')
+                    ) {
                         $object = $user->{$fieldMethod}();
                         $data[$column->getName()] = $object->getName();
                     }
-                    elseif($column->getName() === 'Currency'){
+                    elseif($column->getName() === 'Currency') {
                         //Todo: Do a pull request about \ZCRMUser::geCurrency() to \ZCRMUser::getCurrency()
                         $data[$column->getName()] = $user->geCurrency();
                     }
@@ -146,11 +149,10 @@ class ZohoDatabaseCopier
             // Let's get the last modification date:
             $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
             $lastActivityTime = null;
-            if($tableDetail->hasColumn('modifiedTime')){
+            if($tableDetail->hasColumn('modifiedTime')) {
                 $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM '.$tableName);
             }
-            if(!$lastActivityTime && $tableDetail->hasColumn('createdTime'))
-            {
+            if(!$lastActivityTime && $tableDetail->hasColumn('createdTime')) {
                 $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM '.$tableName);
             }
 
@@ -159,12 +161,12 @@ class ZohoDatabaseCopier
                 $lastActivityTime->setTimezone(new \DateTimeZone($dao->getZohoClient()->getTimezone()));
                 $this->logger->info('Last modified time: '.$lastActivityTime->format(\DateTime::ATOM));
                 // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
-//                $lastActivityTime->add(new \DateInterval('PT1S'));
-//                $lastActivityTime->sub(new \DateInterval('PT1H'));
+                //                $lastActivityTime->add(new \DateInterval('PT1S'));
+                //                $lastActivityTime->sub(new \DateInterval('PT1H'));
                 $lastActivityTime->sub(new \DateInterval('PT1H'));
             }
 
-            $records = $dao->getRecords(null, null,null, $lastActivityTime);
+            $records = $dao->getRecords(null, null, null, $lastActivityTime);
             $deletedRecords = $dao->getDeletedRecordIds($lastActivityTime);
         } else {
             $this->logger->notice("Copying FULL data for '$tableName'");
@@ -187,7 +189,7 @@ class ZohoDatabaseCopier
                     continue;
                 } else {
                     $field = $dao->getFieldFromFieldName($column->getName());
-                    if(!$field){
+                    if(!$field) {
                         continue;
                     }
                     $getterName = $field->getGetter();

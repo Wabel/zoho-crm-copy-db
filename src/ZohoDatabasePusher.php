@@ -32,9 +32,9 @@ class ZohoDatabasePusher
     private $prefix;
 
     /**
-     * @param Connection $connection
-     * @param int $apiLimitInsertUpdateDelete
-     * @param string $prefix
+     * @param Connection      $connection
+     * @param int             $apiLimitInsertUpdateDelete
+     * @param string          $prefix
      * @param LoggerInterface $logger
      */
     public function __construct(Connection $connection, $apiLimitInsertUpdateDelete = 100, $prefix = 'zoho_', LoggerInterface $logger = null)
@@ -47,7 +47,7 @@ class ZohoDatabasePusher
             $this->logger = $logger;
         }
         $this->apiLimitInsertUpdateDelete = $apiLimitInsertUpdateDelete;
-        if($apiLimitInsertUpdateDelete === null){
+        if($apiLimitInsertUpdateDelete === null) {
             $this->apiLimitInsertUpdateDelete = 100;
         }
     }
@@ -58,16 +58,18 @@ class ZohoDatabasePusher
     private $apiLimitInsertUpdateDelete;
 
     /**
-     * @param AbstractZohoDao $zohoDao
-     * @param bool $update
+     * @param  AbstractZohoDao $zohoDao
+     * @param  bool            $update
      * @return int
      */
     private function countElementInTable(AbstractZohoDao $zohoDao, $update = false)
     {
         $localTable = $update ? 'local_update' : 'local_insert';
         $tableName = ZohoDatabaseHelper::getTableName($zohoDao, $this->prefix);
-        return $this->connection->executeQuery('select uid from '.$localTable.' where table_name like :tableName',
-            ['tableName' => $tableName])->rowCount();
+        return $this->connection->executeQuery(
+            'select uid from '.$localTable.' where table_name like :tableName',
+            ['tableName' => $tableName]
+        )->rowCount();
     }
 
     /**
@@ -92,23 +94,24 @@ class ZohoDatabasePusher
                 $statement->addSelect('l.field_name as updated_fieldname');
             }
             $statement->from($localTable, 'l')
-                ->join('l','('.$statementLimiter->getSQL().')','ll','ll.table_name = l.table_name and  ll.uid = l.uid')
+                ->join('l', '('.$statementLimiter->getSQL().')', 'll', 'll.table_name = l.table_name and  ll.uid = l.uid')
                 ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
                 ->where('l.table_name=:table_name')
-                ->setParameters([
+                ->setParameters(
+                    [
                     'table_name' => $tableName,
-                ])
-            ;
+                    ]
+                );
             $results = $statement->execute();
             /* @var $zohoBeans ZohoBeanInterface[] */
             $zohoBeans = array();
             while ($row = $results->fetch()) {
-//                $beanClassName = $zohoDao->getBeanClassName();
+                //                $beanClassName = $zohoDao->getBeanClassName();
                 /* @var $zohoBean ZohoBeanInterface */
                 if (isset($zohoBeans[$row['uid']])) {
                     $zohoBean = $zohoBeans[$row['uid']];
                 } else {
-//                    $zohoBean = new $beanClassName();
+                    //                    $zohoBean = new $beanClassName();
                     $zohoBean = $zohoDao->create();
                 }
 
@@ -125,18 +128,18 @@ class ZohoDatabasePusher
                     $rowsDeleted[] = $row['uid'];
                 }
             }
-            if($zohoBeans){
-                $this->sendDataToZohoCleanLocal($zohoDao,$zohoBeans,$rowsDeleted,$update);
+            if($zohoBeans) {
+                $this->sendDataToZohoCleanLocal($zohoDao, $zohoBeans, $rowsDeleted, $update);
             }
-            $countToPush = $this->countElementInTable($zohoDao,$update);
+            $countToPush = $this->countElementInTable($zohoDao, $update);
         } while($countToPush > 0);
     }
 
     /**
-     * @param AbstractZohoDao $zohoDao
+     * @param AbstractZohoDao     $zohoDao
      * @param ZohoBeanInterface[] $zohoBeans
-     * @param string[] $rowsDeleted
-     * @param bool $update
+     * @param string[]            $rowsDeleted
+     * @param bool                $update
      */
     private function sendDataToZohoCleanLocal(AbstractZohoDao $zohoDao, array $zohoBeans,$rowsDeleted, $update = false)
     {
@@ -161,7 +164,8 @@ class ZohoDatabasePusher
                 }
             }
         } else {
-            $this->connection->executeUpdate('delete from local_update where uid in ( :rowsDeleted)',
+            $this->connection->executeUpdate(
+                'delete from local_update where uid in ( :rowsDeleted)',
                 [
                     'rowsDeleted' => $rowsDeleted,
                 ],
@@ -174,16 +178,18 @@ class ZohoDatabasePusher
 
     /**
      * Insert data to bean in order to insert zoho records.
-     * @param AbstractZohoDao $dao
+     *
+     * @param AbstractZohoDao   $dao
      * @param ZohoBeanInterface $zohoBean
-     * @param array $row
+     * @param array             $row
      */
     private function insertDataZohoBean(AbstractZohoDao $dao, ZohoBeanInterface $zohoBean, array $row)
     {
         foreach ($row as $columnName => $columnValue) {
             $fieldMethod = $dao->getFieldFromFieldName($columnName);
             if(!in_array($columnName, EntitiesGeneratorService::$defaultDateFields) && $fieldMethod
-                && (!in_array($columnName, ['id', 'uid'])) && !is_null($columnValue)) {
+                && (!in_array($columnName, ['id', 'uid'])) && !is_null($columnValue)
+            ) {
                 $type = $fieldMethod->getType();
                 $value = $this->formatValueToBeans($type, $columnValue);
                 $setterMethod = $fieldMethod->getSetter();
@@ -204,7 +210,8 @@ class ZohoDatabasePusher
     {
         $fieldMethod = $dao->getFieldFromFieldName($columnName);
         if (!in_array($columnName, EntitiesGeneratorService::$defaultDateFields) && $fieldMethod
-            && !in_array($columnName, ['id', 'uid'])) {
+            && !in_array($columnName, ['id', 'uid'])
+        ) {
             $type = $fieldMethod->getType();
             $value = is_null($valueDb) ? $valueDb : $this->formatValueToBeans($type, $valueDb);
             $setterMethod = $fieldMethod->getSetter();
@@ -223,26 +230,26 @@ class ZohoDatabasePusher
     private function formatValueToBeans($type, $value)
     {
         switch ($type) {
-            case 'date':
-                $value = \DateTime::createFromFormat('Y-m-d', $value)?:null;
-                break;
-            case 'datetime':
-                $value = \DateTime::createFromFormat('Y-m-d H:i:s', $value)?:null;
-                break;
-            case 'boolean' :
-                $value = (bool) $value;
-                break;
-            case 'percent' :
-                $value = (int) $value;
-                break;
-            case 'double' :
-                $value = number_format($value, 2);
-                break;
-            case 'multiselectlookup':
-            case 'multiuserlookup':
-            case 'multiselectpicklist':
-                $value = explode(';',$value);
-                break;
+        case 'date':
+            $value = \DateTime::createFromFormat('Y-m-d', $value)?:null;
+            break;
+        case 'datetime':
+            $value = \DateTime::createFromFormat('Y-m-d H:i:s', $value)?:null;
+            break;
+        case 'boolean' :
+            $value = (bool) $value;
+            break;
+        case 'percent' :
+            $value = (int) $value;
+            break;
+        case 'double' :
+            $value = number_format($value, 2);
+            break;
+        case 'multiselectlookup':
+        case 'multiuserlookup':
+        case 'multiselectpicklist':
+            $value = explode(';', $value);
+            break;
         }
 
         return $value;
@@ -259,11 +266,13 @@ class ZohoDatabasePusher
         $tableName = ZohoDatabaseHelper::getTableName($zohoDao, $this->prefix);
         $statement = $this->connection->createQueryBuilder();
         $statement->select('l.id')
-        ->from($localTable, 'l')
-        ->where('l.table_name=:table_name')
-        ->setParameters([
-            'table_name' => $tableName,
-        ]);
+            ->from($localTable, 'l')
+            ->where('l.table_name=:table_name')
+            ->setParameters(
+                [
+                'table_name' => $tableName,
+                ]
+            );
         $results = $statement->execute();
         while ($row = $results->fetch()) {
             $zohoDao->delete($row['id']);

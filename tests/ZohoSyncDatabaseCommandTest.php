@@ -2,6 +2,7 @@
 
 namespace Wabel\Zoho\CRM\Copy;
 
+use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 use Wabel\Zoho\CRM\AbstractZohoDao;
@@ -10,7 +11,7 @@ use Prophecy\Argument;
 use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 use Psr\Log\NullLogger;
 
-class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
+class ZohoSyncDatabaseCommandTest extends TestCase
 {
     /**
      * @var ZohoClient
@@ -28,7 +29,8 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
                 'applicationLogFilePath' => getenv('applicationLogFilePath'),
                 'persistence_handler_class' => getenv('persistence_handler_class'),
                 'token_persistence_path' => getenv('token_persistence_path'),
-            ]
+            ],
+            getenv('timeZone')
         );
     }
 
@@ -39,6 +41,7 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
 
     /**
      * Create Module and load them to use after.
+     *
      * @param EntitiesGeneratorService $generator
      */
     private function loadFilesZohoDaos(EntitiesGeneratorService $generator)
@@ -48,7 +51,7 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
         foreach (scandir(__DIR__.'/generated/') as $filename) {
             $path = __DIR__.'/generated/'.$filename;
             if (is_file($path)) {
-                require_once $path;
+                include_once $path;
             }
         }
     }
@@ -74,8 +77,12 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
 
         $logger = new \Mouf\Utils\Log\Psr\MultiLogger();
         $application = new Application();
-        $application->add(new ZohoSyncDatabaseCommand($syncModel->reveal(), $dbCopier->reveal(), $pusher->reveal(),
-            $generator, $this->zohoClient, __DIR__.'/generated/', 'TestNamespace', $logger));
+        $application->add(
+            new ZohoSyncDatabaseCommand(
+                $syncModel->reveal(), $dbCopier->reveal(), $pusher->reveal(),
+                $generator, $this->zohoClient, __DIR__.'/generated/', 'TestNamespace', $logger
+            )
+        );
         
         $command = $application->find('zoho:sync');
         $commandTester = new CommandTester($command);
@@ -95,8 +102,12 @@ class ZohoSyncDatabaseCommandTest extends \PHPUnit_Framework_TestCase
 
         $logger = new \Mouf\Utils\Log\Psr\MultiLogger();
         $application = new Application();
-        $application->add(new ZohoSyncDatabaseCommand($syncModel->reveal(), $dbCopier->reveal(), $pusher->reveal(),
-            $generator, $this->zohoClient, __DIR__.'/generated/', 'TestNamespace', $logger));
+        $application->add(
+            new ZohoSyncDatabaseCommand(
+                $syncModel->reveal(), $dbCopier->reveal(), $pusher->reveal(),
+                $generator, $this->zohoClient, __DIR__.'/generated/', 'TestNamespace', $logger
+            )
+        );
 
         $command = $application->find('zoho:sync');
         $commandTester = new CommandTester($command);

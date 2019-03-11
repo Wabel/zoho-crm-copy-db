@@ -4,11 +4,12 @@ namespace Wabel\Zoho\CRM\Copy;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use PHPUnit\Framework\TestCase;
 use TestNamespace\ContactZohoDao;
 use Wabel\Zoho\CRM\ZohoClient;
 use Wabel\Zoho\CRM\Exception\ZohoCRMResponseException;
 
-class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
+class ZohoDatabasePusherTest extends TestCase
 {
     /**
      * @var Connection
@@ -31,16 +32,18 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
                 'applicationLogFilePath' => getenv('applicationLogFilePath'),
                 'persistence_handler_class' => getenv('persistence_handler_class'),
                 'token_persistence_path' => getenv('token_persistence_path'),
-            ]
+            ],
+            getenv('timeZone')
         );
+
         $config = new \Doctrine\DBAL\Configuration();
         $connectionParams = array(
-            'user' => $GLOBALS['db_username'],
-            'password' => $GLOBALS['db_password'],
-            'host' => $GLOBALS['db_host'],
-            'port' => $GLOBALS['db_port'],
-            'driver' => $GLOBALS['db_driver'],
-            'dbname' => $GLOBALS['db_name'],
+            'user' => getenv('db_username'),
+            'password' => getenv('db_password'),
+            'host' => getenv('db_host'),
+            'port' => getenv('db_port'),
+            'driver' => getenv('db_driver'),
+            'dbname' => getenv('db_name'),
         );
         $this->dbConnection = DriverManager::getConnection($connectionParams, $config);
     }
@@ -64,12 +67,14 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
         $this->dbConnection->insert($tableName, $data);
         $statementTestInsert = $this->dbConnection->createQueryBuilder();
         $statementTestInsert->select('zcrm.*')
-        ->from('local_insert', 'l')
-        ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
-        ->where('l.table_name=:table_name')
-        ->setParameters([
-            'table_name' => $tableName,
-        ]);
+            ->from('local_insert', 'l')
+            ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
+            ->where('l.table_name=:table_name')
+            ->setParameters(
+                [
+                'table_name' => $tableName,
+                ]
+            );
         $resultInsertion = $statementTestInsert->execute()->fetchAll();
         $this->assertNotFalse($resultInsertion);
         $zohoZync->pushInsertedRows($contactZohoDao);
@@ -85,19 +90,21 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
         $this->dbConnection->update($tableName, $dataUpdate, ['id' => $resultContactInserted['id']]);
         $statementTestUpdate = $this->dbConnection->createQueryBuilder();
         $statementTestUpdate->select('l.field_name as updated_fieldname')
-        ->from('local_update', 'l')
-        ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
-        ->where('l.table_name=:table_name')
-        ->andWhere('l.uid = :uid')
-        ->setParameters([
-            'table_name' => $tableName,
-            'uid' => $resultInsertion[0]['uid'],
-        ]);
+            ->from('local_update', 'l')
+            ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
+            ->where('l.table_name=:table_name')
+            ->andWhere('l.uid = :uid')
+            ->setParameters(
+                [
+                'table_name' => $tableName,
+                'uid' => $resultInsertion[0]['uid'],
+                ]
+            );
         $resultUpdate = $statementTestUpdate->execute()->fetchAll();
         $this->assertNotFalse($resultUpdate);
         $this->assertCount(2, $resultUpdate);
         $zohoZync->pushUpdatedRows($contactZohoDao);
-        sleep(60);
+        //        sleep(60);
         $contactZohoUpdate = $contactZohoDao->getById($resultContactInserted['id']);
         $this->assertEquals($dataUpdate['firstName'], $contactZohoUpdate->getFirstName());
         $this->assertEquals($dataUpdate['lastName'], $contactZohoUpdate->getLastName());
@@ -106,24 +113,27 @@ class ZohoDatabasePusherTest extends \PHPUnit_Framework_TestCase
         $this->dbConnection->delete($tableName, ['uid' => $resultInsertion[0]['uid']]);
         $statementTestDelete = $this->dbConnection->createQueryBuilder();
         $statementTestDelete->select('l.*')
-        ->from('local_delete', 'l')
-        ->where('l.table_name=:table_name')
-        ->andWhere('l.id = :id')
-        ->setParameters([
-            'table_name' => $tableName,
-            'id' => $resultContactInserted['id'],
-        ]);
+            ->from('local_delete', 'l')
+            ->where('l.table_name=:table_name')
+            ->andWhere('l.id = :id')
+            ->setParameters(
+                [
+                'table_name' => $tableName,
+                'id' => $resultContactInserted['id'],
+                ]
+            );
         $resultDelete = $statementTestDelete->execute()->fetchAll();
         $this->assertNotFalse($resultDelete);
         $zohoZync->pushDeletedRows($contactZohoDao);
         try {
             $recordSearch = $contactZohoDao->getById($resultContactInserted['id']);
             // It returns an empty array when it found nothing.
-            $isRecordSearch = (empty($recordSearch)) ? false : true;
-        } catch (ZohoCRMResponseException $ex) {
+            $isRecordSearch = (empty($recordSearch)) ? null : true;
+        } catch (\ZCRMException $ex) {
+            var_dump($ex->getExceptionCode());
             $isRecordSearch = null;
         }
-        $this->assertFalse($isRecordSearch);
+        $this->assertNull($isRecordSearch);
     }
 
     private function randName()

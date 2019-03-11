@@ -36,7 +36,7 @@ class ZohoDatabaseHelper
     }
 
     /**
-     * @param string $fieldName
+     * @param  string $fieldName
      * @return string
      */
     public static function getUserMethodNameFromField(string $fieldName)
