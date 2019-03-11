@@ -64,7 +64,8 @@ class LocalChangesTracker
         $triggerName = sprintf('TRG_%s_SETUUIDBEFOREINSERT', $table->getName());
 
         //Fix - temporary MySQL 5.7 strict mode
-        $sql = sprintf('
+        $sql = sprintf(
+            '
             DROP TRIGGER IF EXISTS %s;
             
             CREATE TRIGGER %s BEFORE INSERT ON `%s` 
@@ -80,7 +81,8 @@ class LocalChangesTracker
                 SUBSTR(@uuidmy, 25)
               ));
               END IF;
-            ', $triggerName, $triggerName, $table->getName());
+            ', $triggerName, $triggerName, $table->getName()
+        );
 
         $this->connection->exec($sql);
     }
@@ -89,7 +91,8 @@ class LocalChangesTracker
     {
         $triggerName = sprintf('TRG_%s_ONINSERT', $table->getName());
 
-        $sql = sprintf('
+        $sql = sprintf(
+            '
             DROP TRIGGER IF EXISTS %s;
             
             CREATE TRIGGER %s AFTER INSERT ON `%s` 
@@ -102,7 +105,8 @@ class LocalChangesTracker
               END IF;
             END;
             
-            ', $triggerName, $triggerName, $table->getName(), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()));
+            ', $triggerName, $triggerName, $table->getName(), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()), $this->connection->quote($table->getName())
+        );
 
         $this->connection->exec($sql);
     }
@@ -111,7 +115,8 @@ class LocalChangesTracker
     {
         $triggerName = sprintf('TRG_%s_ONDELETE', $table->getName());
 
-        $sql = sprintf('
+        $sql = sprintf(
+            '
             DROP TRIGGER IF EXISTS %s;
             
             CREATE TRIGGER %s BEFORE DELETE ON `%s` 
@@ -124,7 +129,8 @@ class LocalChangesTracker
               DELETE FROM local_update WHERE table_name = %s AND uid = OLD.uid;
             END;
             
-            ', $triggerName, $triggerName, $table->getName(), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()));
+            ', $triggerName, $triggerName, $table->getName(), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()), $this->connection->quote($table->getName())
+        );
 
         $this->connection->exec($sql);
     }
@@ -140,14 +146,17 @@ class LocalChangesTracker
                 continue;
             }
             $columnName = $this->connection->quoteIdentifier($column->getName());
-            $innerCode .= sprintf('
+            $innerCode .= sprintf(
+                '
                 IF NOT(NEW.%s <=> OLD.%s) THEN
                   REPLACE INTO local_update VALUES (%s, NEW.uid, %s);
                 END IF;
-            ', $columnName, $columnName, $this->connection->quote($table->getName()), $this->connection->quote($column->getName()));
+            ', $columnName, $columnName, $this->connection->quote($table->getName()), $this->connection->quote($column->getName())
+            );
         }
 
-        $sql = sprintf('
+        $sql = sprintf(
+            '
             DROP TRIGGER IF EXISTS %s;
             
             CREATE TRIGGER %s AFTER UPDATE ON `%s` 
@@ -158,7 +167,8 @@ class LocalChangesTracker
               END IF;
             END;
             
-            ', $triggerName, $triggerName, $table->getName(), $innerCode);
+            ', $triggerName, $triggerName, $table->getName(), $innerCode
+        );
 
         $this->connection->exec($sql);
     }

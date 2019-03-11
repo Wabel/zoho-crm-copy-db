@@ -4,11 +4,12 @@ namespace Wabel\Zoho\CRM\Copy;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use PHPUnit\Framework\TestCase;
 use TestNamespace\Contact;
 use TestNamespace\ContactZohoDao;
 use Wabel\Zoho\CRM\ZohoClient;
 
-class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
+class ZohoDatabaseCopierTest extends TestCase
 {
     /**
      * @var Connection
@@ -31,17 +32,18 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
                 'applicationLogFilePath' => getenv('applicationLogFilePath'),
                 'persistence_handler_class' => getenv('persistence_handler_class'),
                 'token_persistence_path' => getenv('token_persistence_path'),
-            ]
+            ],
+            getenv('timeZone')
         );
 
         $config = new \Doctrine\DBAL\Configuration();
         $connectionParams = array(
-            'user' => $GLOBALS['db_username'],
-            'password' => $GLOBALS['db_password'],
-            'host' => $GLOBALS['db_host'],
-            'port' => $GLOBALS['db_port'],
-            'driver' => $GLOBALS['db_driver'],
-            'dbname' => $GLOBALS['db_name'],
+            'user' => getenv('db_username'),
+            'password' => getenv('db_password'),
+            'host' => getenv('db_host'),
+            'port' => getenv('db_port'),
+            'driver' => getenv('db_driver'),
+            'dbname' => getenv('db_name'),
         );
         $this->dbConnection = DriverManager::getConnection($connectionParams, $config);
     }
@@ -56,6 +58,9 @@ class ZohoDatabaseCopierTest extends \PHPUnit_Framework_TestCase
      */
     public function testFetch()
     {
+        if(!class_exists('Wabel\Zoho\CRM\Copy\TestListener')) {
+            include_once 'TestListener.php';
+        }
         $listener = new TestListener();
 
         $contactZohoDao = new ContactZohoDao($this->zohoClient);

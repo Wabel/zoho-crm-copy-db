@@ -4,13 +4,14 @@ namespace Wabel\Zoho\CRM\Copy;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use TestNamespace\Contact;
 use TestNamespace\ContactZohoDao;
 use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 use Wabel\Zoho\CRM\ZohoClient;
 
-class ZohoDatabaseModelSyncTest extends \PHPUnit_Framework_TestCase
+class ZohoDatabaseModelSyncTest extends TestCase
 {
     /**
      * @var Connection
@@ -21,14 +22,15 @@ class ZohoDatabaseModelSyncTest extends \PHPUnit_Framework_TestCase
     {
         $config = new \Doctrine\DBAL\Configuration();
         $connectionParams = array(
-            'user' => $GLOBALS['db_username'],
-            'password' => $GLOBALS['db_password'],
-            'host' => $GLOBALS['db_host'],
-            'port' => $GLOBALS['db_port'],
-            'driver' => $GLOBALS['db_driver'],
+            'user' => getenv('db_username'),
+            'password' => getenv('db_password'),
+            'host' => getenv('db_host'),
+            'port' => getenv('db_port'),
+            'driver' => getenv('db_driver'),
+            'dbname' => getenv('db_name'),
         );
         $adminConn = DriverManager::getConnection($connectionParams, $config);
-        $adminConn->getSchemaManager()->dropAndCreateDatabase($GLOBALS['db_name']);
+        $adminConn->getSchemaManager()->dropAndCreateDatabase(getenv('db_name'));
     }
 
     /**
@@ -47,16 +49,17 @@ class ZohoDatabaseModelSyncTest extends \PHPUnit_Framework_TestCase
                 'applicationLogFilePath' => getenv('applicationLogFilePath'),
                 'persistence_handler_class' => getenv('persistence_handler_class'),
                 'token_persistence_path' => getenv('token_persistence_path'),
-            ]
+            ],
+            getenv('timeZone')
         );
         $config = new \Doctrine\DBAL\Configuration();
         $connectionParams = array(
-            'user' => $GLOBALS['db_username'],
-            'password' => $GLOBALS['db_password'],
-            'host' => $GLOBALS['db_host'],
-            'port' => $GLOBALS['db_port'],
-            'driver' => $GLOBALS['db_driver'],
-            'dbname' => $GLOBALS['db_name'],
+            'user' => getenv('db_username'),
+            'password' => getenv('db_password'),
+            'host' => getenv('db_host'),
+            'port' => getenv('db_port'),
+            'driver' => getenv('db_driver'),
+            'dbname' => getenv('db_name'),
         );
         $this->dbConnection = DriverManager::getConnection($connectionParams, $config);
     }
@@ -77,8 +80,8 @@ class ZohoDatabaseModelSyncTest extends \PHPUnit_Framework_TestCase
         $generator = $this->getEntitiesGeneratorService();
         $generator->generateModule('Contacts', 'Contacts', 'Contact', __DIR__.'/generated/', 'TestNamespace');
 
-        require __DIR__.'/generated/Contact.php';
-        require __DIR__.'/generated/ContactZohoDao.php';
+        include __DIR__.'/generated/Contact.php';
+        include __DIR__.'/generated/ContactZohoDao.php';
 
         $contactZohoDao = new ContactZohoDao($this->zohoClient);
 
