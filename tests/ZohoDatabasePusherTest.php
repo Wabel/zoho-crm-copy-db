@@ -130,7 +130,6 @@ class ZohoDatabasePusherTest extends TestCase
             // It returns an empty array when it found nothing.
             $isRecordSearch = (empty($recordSearch)) ? null : true;
         } catch (\ZCRMException $ex) {
-            var_dump($ex->getExceptionCode());
             $isRecordSearch = null;
         }
         $this->assertNull($isRecordSearch);
