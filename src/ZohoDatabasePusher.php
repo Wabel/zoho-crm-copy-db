@@ -105,7 +105,11 @@ class ZohoDatabasePusher
             //To optimize your API usage, get maximum 200 records with each request and insert, update or delete maximum 100 records with each request.
             $statementLimiter = $this->connection->createQueryBuilder();
             $statementLimiter->select('DISTINCT table_name,uid')
-                ->from($localTable)->setMaxResults($this->apiLimitInsertUpdateDelete);
+                ->from($localTable)
+                ->where('table_name=:table_name')
+                ->setParameters([
+                    'table_name' => $tableName,
+                ]);
             $statement = $this->connection->createQueryBuilder();
             $statement->select('zcrm.*');
             if ($update) {
@@ -114,6 +118,7 @@ class ZohoDatabasePusher
             $statement->from($localTable, 'l')
                 ->join('l','('.$statementLimiter->getSQL().')','ll','ll.table_name = l.table_name and  ll.uid = l.uid')
                 ->join('l', $tableName, 'zcrm', 'zcrm.uid = l.uid')
+                ->setMaxResults($this->apiLimitInsertUpdateDelete)
                 ->where('l.table_name=:table_name')
                 ->setParameters([
                     'table_name' => $tableName,
