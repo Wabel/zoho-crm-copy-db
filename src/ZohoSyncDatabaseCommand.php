@@ -168,7 +168,7 @@ class ZohoSyncDatabaseCommand extends Command
         $twoWaysSync = !$input->getOption('fetch-only');
         $skipCreateTrigger = $input->getOption('skip-trigger');
 
-        $output->writeln('Starting synchronize Zoho data into Zoho CRM.');
+        $output->writeln('Starting to synchronize Zoho data into Zoho CRM.');
         foreach ($this->zohoDaos as $zohoDao) {
             $this->zohoDatabaseModelSync->synchronizeDbModel($zohoDao, $twoWaysSync, $skipCreateTrigger);
         }
@@ -182,7 +182,7 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function syncUserModel(OutputInterface $output)
     {
-        $output->writeln('Starting synchronize Zoho users model.');
+        $output->writeln('Starting to synchronize Zoho users model.');
         $this->zohoDatabaseModelSync->synchronizeUserDbModel();
         $output->writeln('Zoho users model successfully synchronized.');
     }
@@ -206,7 +206,7 @@ class ZohoSyncDatabaseCommand extends Command
                 continue;
             }
             $this->zohoDaos [] = $zohoDao;
-            $output->writeln(sprintf('<info>%s has created</info>', get_class($zohoDao)));
+            $output->writeln(sprintf('<info>%s has been created</info>', get_class($zohoDao)));
         }
         $output->writeln("Success to create all the zoho daos.");
     }
@@ -219,7 +219,7 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function fetchUserDb(InputInterface $input, OutputInterface $output)
     {
-        $output->writeln('Starting copying Zoho users data into local database.');
+        $output->writeln('Start to copy Zoho users data into local database.');
         $this->zohoDatabaseCopier->fetchUserFromZoho();
         $output->writeln('Zoho users data successfully copied.');
     }
@@ -241,7 +241,7 @@ class ZohoSyncDatabaseCommand extends Command
 
         $twoWaysSync = !$input->getOption('fetch-only');
 
-        $output->writeln('Starting copying Zoho data into local database.');
+        $output->writeln('Start to copy Zoho data into local database.');
         foreach ($this->zohoDaos as $zohoDao) {
                 $output->writeln(sprintf('Copying data using <info>%s</info>', get_class($zohoDao)));
                 $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync);
@@ -256,7 +256,7 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function pushDb(OutputInterface $output)
     {
-        $output->writeln('Starting synchronize Zoho data into Zoho CRM.');
+        $output->writeln('Start to synchronize Zoho data into Zoho CRM.');
         foreach ($this->zohoDaos as $zohoDao) {
             if($zohoDao->getFieldFromFieldName('createdTime')) {
                 $this->zohoDatabaseSync->pushToZoho($zohoDao);
