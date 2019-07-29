@@ -206,7 +206,7 @@ class ZohoSyncDatabaseCommand extends Command
         $twoWaysSync = !$input->getOption('fetch-only');
         $skipCreateTrigger = $input->getOption('skip-trigger');
 
-        $this->logger->info('Starting synchronize Zoho data into Zoho CRM.');
+        $this->logger->info('Starting to synchronize Zoho data into Zoho CRM.');
         foreach ($this->zohoDaos as $zohoDao) {
             $this->zohoDatabaseModelSync->synchronizeDbModel($zohoDao, $twoWaysSync, $skipCreateTrigger);
         }
@@ -218,7 +218,7 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function syncUserModel()
     {
-        $this->logger->info('Starting synchronize Zoho users model.');
+        $this->logger->info('Starting to synchronize Zoho users model.');
         $this->zohoDatabaseModelSync->synchronizeUserDbModel();
         $this->logger->info('Zoho users model successfully synchronized.');
     }
@@ -249,7 +249,7 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function fetchUserDb()
     {
-        $this->logger->info('Starting copying Zoho users data into local database.');
+        $this->logger->info('Start to copy Zoho users data into local database.');
         $this->zohoDatabaseCopier->fetchUserFromZoho();
         $this->logger->info('Zoho users data successfully copied.');
     }
@@ -270,7 +270,7 @@ class ZohoSyncDatabaseCommand extends Command
 
         $twoWaysSync = !$input->getOption('fetch-only');
 
-        $this->logger->info('Starting copying Zoho data into local database.');
+        $this->logger->info('Start to copy Zoho data into local database.');
         foreach ($this->zohoDaos as $zohoDao) {
             $this->logger->info(sprintf('Copying data using %s', get_class($zohoDao)));
                 $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync);
@@ -283,7 +283,7 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function pushDb()
     {
-        $this->logger->info('Starting synchronize Zoho data into Zoho CRM.');
+        $this->logger->info('Start to synchronize Zoho data into Zoho CRM.');
         foreach ($this->zohoDaos as $zohoDao) {
             if($zohoDao->getFieldFromFieldName('createdTime')) {
                 $this->zohoDatabaseSync->pushToZoho($zohoDao);

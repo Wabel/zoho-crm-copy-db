@@ -8,6 +8,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 use Wabel\Zoho\CRM\Request\Response;
+use zcrmsdk\crm\setup\users\ZCRMUser;
 
 /**
  * This class is in charge of synchronizing one table MODEL with Zoho.
@@ -221,7 +222,7 @@ class ZohoDatabaseModelSync
 
         $table->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
         $table->setPrimaryKey(['id']);
-        foreach (\ZCRMUser::$defaultKeys as $field) {
+        foreach (ZCRMUser::$defaultKeys as $field) {
             if ($field === 'id') {
                 continue;
             }
