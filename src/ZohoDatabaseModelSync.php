@@ -37,6 +37,11 @@ class ZohoDatabaseModelSync
     private $zohoUserService;
 
     /**
+     * @var bool $trackingTablesDone
+     */
+    private $trackingTablesDone;
+
+    /**
      * ZohoDatabaseCopier constructor.
      *
      * @param Connection $connection
@@ -53,6 +58,7 @@ class ZohoDatabaseModelSync
         }
         $this->localChangesTracker = new LocalChangesTracker($connection, $this->logger);
         $this->zohoUserService = $zohoUserService;
+        $this->trackingTablesDone = false;
     }
 
     /**
@@ -75,12 +81,13 @@ class ZohoDatabaseModelSync
      */
     public function synchronizeDbModel(AbstractZohoDao $dao, $twoWaysSync, $skipCreateTrigger = false)
     {
-        if ($twoWaysSync === true) {
+        if ($twoWaysSync === true && !$this->trackingTablesDone) {
             $this->localChangesTracker->createTrackingTables();
+            $this->trackingTablesDone = true;
         }
 
         $tableName = ZohoDatabaseHelper::getTableName($dao, $this->prefix);
-        $this->logger->info('Synchronizing DB Model for '.$tableName);
+        $this->logger->info('Synchronizing DB Model for '.$tableName.'...');
 
         $schema = new Schema();
         $table = $schema->createTable($tableName);

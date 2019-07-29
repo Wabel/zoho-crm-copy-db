@@ -120,7 +120,7 @@ class ZohoSyncDatabaseCommand extends Command
             ->addOption('fetch-only', 'f', InputOption::VALUE_NONE, 'Fetch only the Zoho data in local database')
             ->addOption('push-only', 'p', InputOption::VALUE_NONE, 'Push only the local data to Zoho')
             ->addOption('limit', 'l', InputOption::VALUE_NONE, 'use defined memory limit or unlimited memory limit')
-            ->addOption('log-path', null, InputOption::VALUE_NONE, 'Set the path of logs file')
+            ->addOption('log-path', null, InputOption::VALUE_OPTIONAL, 'Set the path of logs file')
             ->addOption('clear-logs', null, InputOption::VALUE_NONE, 'Clear logs file at startup')
             ->addOption('dump-logs', null, InputOption::VALUE_NONE, 'Dump logs into console when command finishes');
     }
@@ -135,19 +135,19 @@ class ZohoSyncDatabaseCommand extends Command
 
             // TODO: find a better way when zohocrm/php-sdk:src/crm/utility/Logger.php will allow to get the filename, delete, etc.
             if ($input->getOption('log-path') && $input->getOption('clear-logs')) {
-                $output->writeln('Clearing logs...');
+                $this->logger->info('Clearing logs...');
                 $path = $input->getOption('log-path');
                 $logFile = $path . '/ZCRMClientLibrary.log';
                 if (file_exists($logFile)) {
                     if (is_writable($logFile)) {
                         if (file_put_contents($logFile, '') === false) {
-                            $output->writeln(sprintf('<error>Error when clearing log file in %s</error>', $logFile));
+                            $this->logger->error(sprintf('Error when clearing log file in %s', $logFile));
                         }
                     } else {
-                        $output->writeln(sprintf('<warning>Cannot write into log file in %s</warning>', $logFile));
+                        $this->logger->warning(sprintf('Cannot write into log file in %s', $logFile));
                     }
                 } else {
-                    $output->writeln(sprintf('<warning>Cannot find log file in %s</warning>', $logFile));
+                    $this->logger->warning(sprintf('Cannot find log file in %s', $logFile));
                 }
             }
 
@@ -156,35 +156,35 @@ class ZohoSyncDatabaseCommand extends Command
             }
 
             if ($input->getOption('fetch-only') && $input->getOption('push-only')) {
-                $output->writeln('<error>Options fetch-only and push-only are mutually exclusive.</error>');
+                $this->logger->error('Options fetch-only and push-only are mutually exclusive.');
             }
 
-            $this->syncUserModel($output);
+            $this->syncUserModel();
 
-            $this->regenerateZohoDao($output);
+            $this->regenerateZohoDao();
 
-            $this->syncModel($input, $output);
+            $this->syncModel($input);
 
             if (!$input->getOption('push-only')) {
-                $this->fetchUserDb($input, $output);
-                $this->fetchDb($input, $output);
+                $this->fetchUserDb();
+                $this->fetchDb($input);
             }
             if (!$input->getOption('fetch-only')) {
-                $this->pushDb($output);
+                $this->pushDb();
             }
 
             if ($input->getOption('log-path') && $input->getOption('dump-logs')) {
-                $output->writeln('Dumping logs...');
+                $this->logger->info('Dumping logs...');
                 $path = $input->getOption('log-path');
                 $logFile = $path . '/ZCRMClientLibrary.log';
                 if (file_exists($logFile)) {
                     if (is_readable($logFile)) {
-                        $output->writeln(file_get_contents($logFile));
+                        $this->logger->info(file_get_contents($logFile));
                     } else {
-                        $output->writeln(sprintf('<warning>Cannot read into log file in %s</warning>', $logFile));
+                        $this->logger->warning(sprintf('Cannot read into log file in %s', $logFile));
                     }
                 } else {
-                    $output->writeln(sprintf('<warning>Cannot find log file in %s</warning>', $logFile));
+                    $this->logger->warning(sprintf('Cannot find log file in %s', $logFile));
                 }
             }
 
@@ -192,74 +192,66 @@ class ZohoSyncDatabaseCommand extends Command
                 $this->lock->releaseLock();
             }
         } catch (LockException $e) {
-            $output->writeln('<error>Could not start zoho:copy-db copy command. Another zoho:copy-db copy command is already running.</error>');
+            $this->logger->error('Could not start zoho:copy-db copy command. Another zoho:copy-db copy command is already running.');
         }
     }
 
     /**
      * Sychronizes the model of the database with Zoho records.
      *
-     * @param OutputInterface $output
+     * @param InputInterface $input
      */
-    private function syncModel(InputInterface $input, OutputInterface $output)
+    private function syncModel(InputInterface $input)
     {
         $twoWaysSync = !$input->getOption('fetch-only');
         $skipCreateTrigger = $input->getOption('skip-trigger');
 
-        $output->writeln('Starting to synchronize Zoho data into Zoho CRM.');
+        $this->logger->info('Starting to synchronize Zoho data into Zoho CRM.');
         foreach ($this->zohoDaos as $zohoDao) {
             $this->zohoDatabaseModelSync->synchronizeDbModel($zohoDao, $twoWaysSync, $skipCreateTrigger);
         }
-        $output->writeln('Zoho data successfully synchronized.');
+        $this->logger->info('Zoho data successfully synchronized.');
     }
 
     /**
      * Sychronizes the model of the database with Zoho Users records.
-     *
-     * @param OutputInterface $output
      */
-    private function syncUserModel(OutputInterface $output)
+    private function syncUserModel()
     {
-        $output->writeln('Starting to synchronize Zoho users model.');
+        $this->logger->info('Starting to synchronize Zoho users model.');
         $this->zohoDatabaseModelSync->synchronizeUserDbModel();
-        $output->writeln('Zoho users model successfully synchronized.');
+        $this->logger->info('Zoho users model successfully synchronized.');
     }
 
     /**
      * Regerate Zoho Daos
-     *
-     * @param InputInterface  $input
-     * @param OutputInterface $output
      */
-    private function regenerateZohoDao(OutputInterface $output)
+    private function regenerateZohoDao()
     {
-        $output->writeln("Start to generate all the zoho daos.");
+        $this->logger->info('Start to generate all the zoho daos.');
         $zohoModules = $this->zohoEntitiesGenerator->generateAll($this->pathZohoDaos, $this->namespaceZohoDaos);
         foreach ($zohoModules as $daoFullClassName) {
             /* @var $zohoDao AbstractZohoDao */
             $zohoDao = new $daoFullClassName($this->zohoClient);
             //To have more module which is use time of modification (createdTime or lastActivityTime).
             //use an array of Excluded Dao by full namespace
-            if (($this->excludedZohoDao && in_array(get_class($zohoDao), $this->excludedZohoDao))) {
+            if ($this->excludedZohoDao && in_array(get_class($zohoDao), $this->excludedZohoDao)) {
                 continue;
             }
             $this->zohoDaos [] = $zohoDao;
-            $output->writeln(sprintf('<info>%s has been created</info>', get_class($zohoDao)));
+            $this->logger->info(sprintf('%s has been created', get_class($zohoDao)));
         }
-        $output->writeln("Success to create all the zoho daos.");
+        $this->logger->info('Finished to create all the zoho daos.');
     }
 
     /**
      * Run the fetch User Db command.
-     *
-     * @param InputInterface  $input
-     * @param OutputInterface $output
      */
-    private function fetchUserDb(InputInterface $input, OutputInterface $output)
+    private function fetchUserDb()
     {
-        $output->writeln('Start to copy Zoho users data into local database.');
+        $this->logger->info('Start to copy Zoho users data into local database.');
         $this->zohoDatabaseCopier->fetchUserFromZoho();
-        $output->writeln('Zoho users data successfully copied.');
+        $this->logger->info('Zoho users data successfully copied.');
     }
     
     
@@ -267,9 +259,8 @@ class ZohoSyncDatabaseCommand extends Command
      * Run the fetch Db command.
      *
      * @param InputInterface  $input
-     * @param OutputInterface $output
      */
-    private function fetchDb(InputInterface $input, OutputInterface $output)
+    private function fetchDb(InputInterface $input)
     {
         if ($input->getOption('reset')) {
             $incremental = false;
@@ -279,27 +270,25 @@ class ZohoSyncDatabaseCommand extends Command
 
         $twoWaysSync = !$input->getOption('fetch-only');
 
-        $output->writeln('Start to copy Zoho data into local database.');
+        $this->logger->info('Start to copy Zoho data into local database.');
         foreach ($this->zohoDaos as $zohoDao) {
-                $output->writeln(sprintf('Copying data using <info>%s</info>', get_class($zohoDao)));
+            $this->logger->info(sprintf('Copying data using %s', get_class($zohoDao)));
                 $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync);
         }
-        $output->writeln('Zoho data successfully copied.');
+        $this->logger->info('Zoho data successfully copied.');
     }
 
     /**
      * Run the push Db command.
-     *
-     * @param OutputInterface $output
      */
-    private function pushDb(OutputInterface $output)
+    private function pushDb()
     {
-        $output->writeln('Start to synchronize Zoho data into Zoho CRM.');
+        $this->logger->info('Start to synchronize Zoho data into Zoho CRM.');
         foreach ($this->zohoDaos as $zohoDao) {
             if($zohoDao->getFieldFromFieldName('createdTime')) {
                 $this->zohoDatabaseSync->pushToZoho($zohoDao);
             }
         }
-        $output->writeln('Zoho data successfully synchronized.');
+        $this->logger->info('Zoho data successfully synchronized.');
     }
 }
