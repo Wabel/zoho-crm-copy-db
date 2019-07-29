@@ -15,6 +15,7 @@ use Wabel\Zoho\CRM\ZohoClient;
 use Logger\Formatters\DateTimeFormatter;
 use Mouf\Utils\Log\Psr\MultiLogger;
 use Wabel\Zoho\CRM\Request\Response;
+use zcrmsdk\crm\utility\ZCRMConfigUtil;
 
 class ZohoSyncDatabaseCommand extends Command
 {
@@ -118,21 +119,42 @@ class ZohoSyncDatabaseCommand extends Command
             ->addOption('skip-trigger', 's', InputOption::VALUE_NONE, 'Do not create or update the trigger')
             ->addOption('fetch-only', 'f', InputOption::VALUE_NONE, 'Fetch only the Zoho data in local database')
             ->addOption('push-only', 'p', InputOption::VALUE_NONE, 'Push only the local data to Zoho')
-            ->addOption('limit', 'l', InputOption::VALUE_NONE, 'use defined memory limit or unlimited memory limit');
+            ->addOption('limit', 'l', InputOption::VALUE_NONE, 'use defined memory limit or unlimited memory limit')
+            ->addOption('log-path', null, InputOption::VALUE_NONE, 'Set the path of logs file')
+            ->addOption('clear-logs', null, InputOption::VALUE_NONE, 'Clear logs file at startup')
+            ->addOption('dump-logs', null, InputOption::VALUE_NONE, 'Dump logs into console when command finishes');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $this->logger->addLogger(new DateTimeFormatter(new ConsoleLogger($output)));
         try {
             if ($this->lock) {
                 $this->lock->acquireLock();
             }
 
+            // TODO: find a better way when zohocrm/php-sdk:src/crm/utility/Logger.php will allow to get the filename, delete, etc.
+            if ($input->getOption('log-path') && $input->getOption('clear-logs')) {
+                $output->writeln('Clearing logs...');
+                $path = $input->getOption('log-path');
+                $logFile = $path . '/ZCRMClientLibrary.log';
+                if (file_exists($logFile)) {
+                    if (is_writable($logFile)) {
+                        if (file_put_contents($logFile, '') === false) {
+                            $output->writeln(sprintf('<error>Error when clearing log file in %s</error>', $logFile));
+                        }
+                    } else {
+                        $output->writeln(sprintf('<warning>Cannot write into log file in %s</warning>', $logFile));
+                    }
+                } else {
+                    $output->writeln(sprintf('<warning>Cannot find log file in %s</warning>', $logFile));
+                }
+            }
+
             if(!$input->getOption('limit')) {
                 ini_set('memory_limit', '-1');
             }
-            
-            $this->logger->addLogger(new DateTimeFormatter(new ConsoleLogger($output)));
+
             if ($input->getOption('fetch-only') && $input->getOption('push-only')) {
                 $output->writeln('<error>Options fetch-only and push-only are mutually exclusive.</error>');
             }
@@ -150,6 +172,22 @@ class ZohoSyncDatabaseCommand extends Command
             if (!$input->getOption('fetch-only')) {
                 $this->pushDb($output);
             }
+
+            if ($input->getOption('log-path') && $input->getOption('dump-logs')) {
+                $output->writeln('Dumping logs...');
+                $path = $input->getOption('log-path');
+                $logFile = $path . '/ZCRMClientLibrary.log';
+                if (file_exists($logFile)) {
+                    if (is_readable($logFile)) {
+                        $output->writeln(file_get_contents($logFile));
+                    } else {
+                        $output->writeln(sprintf('<warning>Cannot read into log file in %s</warning>', $logFile));
+                    }
+                } else {
+                    $output->writeln(sprintf('<warning>Cannot find log file in %s</warning>', $logFile));
+                }
+            }
+
             if ($this->lock) {
                 $this->lock->releaseLock();
             }
