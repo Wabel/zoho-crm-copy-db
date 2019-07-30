@@ -136,7 +136,7 @@ class ZohoSyncDatabaseCommand extends Command
 
             // TODO: find a better way when zohocrm/php-sdk:src/crm/utility/Logger.php will allow to get the filename, delete, etc.
             if ($input->getOption('log-path') && $input->getOption('clear-logs')) {
-                $this->logger->info('Clearing logs...');
+                $this->logger->notice('Clearing logs...');
                 $path = $input->getOption('log-path');
                 $logFile = $path . '/ZCRMClientLibrary.log';
                 if (file_exists($logFile)) {
@@ -207,11 +207,11 @@ class ZohoSyncDatabaseCommand extends Command
         $twoWaysSync = !$input->getOption('fetch-only');
         $skipCreateTrigger = $input->getOption('skip-trigger');
 
-        $this->logger->info('Starting to synchronize Zoho data into Zoho CRM.');
+        $this->logger->notice('Starting to synchronize Zoho DB model with the local database...');
         foreach ($this->zohoDaos as $zohoDao) {
             $this->zohoDatabaseModelSync->synchronizeDbModel($zohoDao, $twoWaysSync, $skipCreateTrigger);
         }
-        $this->logger->info('Zoho data successfully synchronized.');
+        $this->logger->notice('Zoho DB model successfully synchronized.');
     }
 
     /**
@@ -219,9 +219,9 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function syncUserModel()
     {
-        $this->logger->info('Starting to synchronize Zoho users model.');
+        $this->logger->notice('Starting to synchronize Zoho users DB model with the local database...');
         $this->zohoDatabaseModelSync->synchronizeUserDbModel();
-        $this->logger->info('Zoho users model successfully synchronized.');
+        $this->logger->notice('Zoho users DB model successfully synchronized.');
     }
 
     /**
@@ -229,7 +229,7 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function regenerateZohoDao()
     {
-        $this->logger->info('Start to generate all the zoho daos.');
+        $this->logger->notice('Starting to generate all the Zoho daos...');
         $zohoModules = $this->zohoEntitiesGenerator->generateAll($this->pathZohoDaos, $this->namespaceZohoDaos);
         foreach ($zohoModules as $daoFullClassName) {
             /* @var $zohoDao AbstractZohoDao */
@@ -242,7 +242,7 @@ class ZohoSyncDatabaseCommand extends Command
             $this->zohoDaos [] = $zohoDao;
             $this->logger->info(sprintf('%s has been created', get_class($zohoDao)));
         }
-        $this->logger->info('Finished to create all the zoho daos.');
+        $this->logger->notice('Finished to create all the Zoho daos.');
     }
 
     /**
@@ -250,9 +250,9 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function fetchUserDb()
     {
-        $this->logger->info('Start to copy Zoho users data into local database.');
+        $this->logger->notice('Starting to copy Zoho users data into local database...');
         $this->zohoDatabaseCopier->fetchUserFromZoho();
-        $this->logger->info('Zoho users data successfully copied.');
+        $this->logger->notice('Zoho users data successfully copied.');
     }
     
     
@@ -276,12 +276,12 @@ class ZohoSyncDatabaseCommand extends Command
 
         $twoWaysSync = !$input->getOption('fetch-only');
 
-        $this->logger->info('Start to copy Zoho data into local database.');
+        $this->logger->notice('Starting to fetch Zoho data into local database...');
         foreach ($this->zohoDaos as $zohoDao) {
-            $this->logger->info(sprintf('Copying data using %s', get_class($zohoDao)));
-                $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync, $throwErrors);
+            $this->logger->info(sprintf('Copying data into local for %s', get_class($zohoDao)));
+            $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync, $throwErrors);
         }
-        $this->logger->info('Zoho data successfully copied.');
+        $this->logger->notice('Zoho data successfully fetched.');
     }
 
     /**
@@ -289,12 +289,12 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function pushDb()
     {
-        $this->logger->info('Start to synchronize Zoho data into Zoho CRM.');
+        $this->logger->notice('Starting to push data from local database into Zoho CRM...');
         foreach ($this->zohoDaos as $zohoDao) {
             if($zohoDao->getFieldFromFieldName('createdTime')) {
                 $this->zohoDatabaseSync->pushToZoho($zohoDao);
             }
         }
-        $this->logger->info('Zoho data successfully synchronized.');
+        $this->logger->notice('Zoho data successfully pushed.');
     }
 }

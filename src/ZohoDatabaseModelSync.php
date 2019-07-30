@@ -87,7 +87,7 @@ class ZohoDatabaseModelSync
         }
 
         $tableName = ZohoDatabaseHelper::getTableName($dao, $this->prefix);
-        $this->logger->info('Synchronizing DB Model for '.$tableName.'...');
+        $this->logger->notice('Synchronizing DB Model for '.$tableName.'...');
 
         $schema = new Schema();
         $table = $schema->createTable($tableName);
@@ -185,8 +185,6 @@ class ZohoDatabaseModelSync
             default:
                 throw new \RuntimeException('Unknown type "'.$field->getType().'"');
             }
-
-
 
             if ($length) {
                 $options['length'] = $length;

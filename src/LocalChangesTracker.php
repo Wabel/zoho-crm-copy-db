@@ -62,6 +62,7 @@ class LocalChangesTracker
     public function createUuidInsertTrigger(Table $table)
     {
         $triggerName = sprintf('TRG_%s_SETUUIDBEFOREINSERT', $table->getName());
+        $this->logger->info('Creating ' . $triggerName . ' trigger for table ' . $table->getName() . '...');
 
         //Fix - temporary MySQL 5.7 strict mode
         $sql = sprintf(
@@ -90,6 +91,7 @@ class LocalChangesTracker
     public function createInsertTrigger(Table $table)
     {
         $triggerName = sprintf('TRG_%s_ONINSERT', $table->getName());
+        $this->logger->info('Creating ' . $triggerName . ' trigger for table ' . $table->getName() . '...');
 
         $sql = sprintf(
             '
@@ -114,6 +116,7 @@ class LocalChangesTracker
     public function createDeleteTrigger(Table $table)
     {
         $triggerName = sprintf('TRG_%s_ONDELETE', $table->getName());
+        $this->logger->info('Creating ' . $triggerName . ' trigger for table ' . $table->getName() . '...');
 
         $sql = sprintf(
             '
@@ -138,6 +141,7 @@ class LocalChangesTracker
     public function createUpdateTrigger(Table $table)
     {
         $triggerName = sprintf('TRG_%s_ONUPDATE', $table->getName());
+        $this->logger->info('Creating ' . $triggerName . ' trigger for table ' . $table->getName() . '...');
 
         $innerCode = '';
 

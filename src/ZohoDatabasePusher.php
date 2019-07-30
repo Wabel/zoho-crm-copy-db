@@ -287,7 +287,7 @@ class ZohoDatabasePusher
      */
     public function pushInsertedRows(AbstractZohoDao $zohoDao)
     {
-        return $this->pushDataToZoho($zohoDao);
+        $this->pushDataToZoho($zohoDao);
     }
 
     /**
@@ -307,11 +307,11 @@ class ZohoDatabasePusher
      */
     public function pushToZoho(AbstractZohoDao $zohoDao)
     {
-        $this->logger->info(' > Insert new rows using {class_name}', ['class_name' => get_class($zohoDao)]);
+        $this->logger->info(' > Insert new rows for {class_name}', ['class_name' => get_class($zohoDao)]);
         $this->pushInsertedRows($zohoDao);
-        $this->logger->info(' > Update rows using {class_name}', ['class_name' => get_class($zohoDao)]);
+        $this->logger->info(' > Update rows for {class_name}', ['class_name' => get_class($zohoDao)]);
         $this->pushUpdatedRows($zohoDao);
-        $this->logger->info(' > Delete rows using  {class_name}', ['class_name' => get_class($zohoDao)]);
+        $this->logger->info(' > Delete rows for  {class_name}', ['class_name' => get_class($zohoDao)]);
         $this->pushDeletedRows($zohoDao);
     }
 }

@@ -53,24 +53,21 @@ class DbalTableDiffService
                 foreach ($statements as $sql) {
                     $this->connection->exec($sql);
                 }
-
                 return true;
-            } else {
-                $this->logger->info('No changes detected in table structure for '.$tableName);
-
-                return false;
             }
-        } else {
-            $this->logger->notice("Creating new table '$tableName'.");
-            $diff = new SchemaDiff();
-            $diff->fromSchema = $dbSchema;
-            $diff->newTables[$tableName] = $table;
-            $statements = $diff->toSaveSql($this->connection->getDatabasePlatform());
-            foreach ($statements as $sql) {
-                $this->connection->exec($sql);
-            }
-
-            return true;
+            $this->logger->info('No changes detected in table structure for '.$tableName);
+            return false;
         }
+
+        $this->logger->notice("Creating new table '$tableName'.");
+        $diff = new SchemaDiff();
+        $diff->fromSchema = $dbSchema;
+        $diff->newTables[$tableName] = $table;
+        $statements = $diff->toSaveSql($this->connection->getDatabasePlatform());
+        foreach ($statements as $sql) {
+            $this->connection->exec($sql);
+        }
+
+        return true;
     }
 }

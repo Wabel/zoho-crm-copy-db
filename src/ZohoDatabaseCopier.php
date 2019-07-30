@@ -71,7 +71,6 @@ class ZohoDatabaseCopier
     {
         $users = $this->zohoUserService->getUsers();
         $tableName = 'users';
-        $this->logger->notice("Copying FULL data users for '$tableName'");
         $this->logger->info('Fetched ' . count($users) . ' records');
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
@@ -167,7 +166,7 @@ class ZohoDatabaseCopier
                 $records = $dao->getRecords(null, null, null, $lastActivityTime);
                 $deletedRecords = $dao->getDeletedRecordIds($lastActivityTime);
             } else {
-                $this->logger->notice("Copying FULL data for '$tableName'");
+                $this->logger->info("Copying FULL data for '$tableName'");
                 $records = $dao->getRecords();
                 $deletedRecords = [];
             }
