@@ -7,6 +7,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 use Wabel\Zoho\CRM\Request\Response;
+use zcrmsdk\crm\crud\ZCRMRecord;
 
 /**
  * This class is in charge of synchronizing one table of your database with Zoho records.
@@ -191,7 +192,15 @@ class ZohoDatabaseCopier
                     }
                     $getterName = $field->getGetter();
                     $dataValue = $record->$getterName();
-                    $data[$column->getName()] = is_array($dataValue) ? implode(';', $dataValue) : $dataValue;
+                    $finalFieldData = null;
+                    if ($dataValue instanceof ZCRMRecord) {
+                        $finalFieldData = $dataValue->getEntityId();
+                    } elseif (is_array($dataValue)) {
+                        $finalFieldData = implode(';', $dataValue);
+                    } else {
+                        $finalFieldData = $dataValue;
+                    }
+                    $data[$column->getName()] = $finalFieldData;
                     $types[$column->getName()] = $column->getType()->getName();
                 }
             }
