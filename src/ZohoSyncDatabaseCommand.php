@@ -122,7 +122,8 @@ class ZohoSyncDatabaseCommand extends Command
             ->addOption('limit', 'l', InputOption::VALUE_NONE, 'use defined memory limit or unlimited memory limit')
             ->addOption('log-path', null, InputOption::VALUE_OPTIONAL, 'Set the path of logs file')
             ->addOption('clear-logs', null, InputOption::VALUE_NONE, 'Clear logs file at startup')
-            ->addOption('dump-logs', null, InputOption::VALUE_NONE, 'Dump logs into console when command finishes');
+            ->addOption('dump-logs', null, InputOption::VALUE_NONE, 'Dump logs into console when command finishes')
+            ->addOption('continue-on-error', null, InputOption::VALUE_NONE, 'Don\'t stop the command on errors');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -262,6 +263,11 @@ class ZohoSyncDatabaseCommand extends Command
      */
     private function fetchDb(InputInterface $input)
     {
+        $throwErrors = true;
+        if ($input->getOption('continue-on-error')) {
+            $throwErrors = false;
+        }
+
         if ($input->getOption('reset')) {
             $incremental = false;
         } else {
@@ -273,7 +279,7 @@ class ZohoSyncDatabaseCommand extends Command
         $this->logger->info('Start to copy Zoho data into local database.');
         foreach ($this->zohoDaos as $zohoDao) {
             $this->logger->info(sprintf('Copying data using %s', get_class($zohoDao)));
-                $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync);
+                $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync, $throwErrors);
         }
         $this->logger->info('Zoho data successfully copied.');
     }
