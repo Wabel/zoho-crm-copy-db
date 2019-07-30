@@ -75,10 +75,10 @@ class LocalChangesTracker
               THEN
               	SET @uuidmy = uuid();
                 SET new.uid = LOWER(CONCAT(
-                SUBSTR(@uuidmy, 1, 8), \' - \',
-                SUBSTR(@uuidmy, 10, 4), \' - \',
-                SUBSTR(@uuidmy, 15, 4), \' - \',
-                SUBSTR(@uuidmy, 20, 4), \' - \',
+                SUBSTR(@uuidmy, 1, 8), \'-\',
+                SUBSTR(@uuidmy, 10, 4), \'-\',
+                SUBSTR(@uuidmy, 15, 4), \'-\',
+                SUBSTR(@uuidmy, 20, 4), \'-\',
                 SUBSTR(@uuidmy, 25)
               ));
               END IF;
