@@ -181,6 +181,16 @@ class ZohoDatabaseModelSync
                 throw new \RuntimeException('Unknown type "'.$field->getType().'"');
             }
 
+            // For MySQL, the maximum row size is 65535 bytes.
+            // If we have a lot of varchar 255, it will go above the limit.
+            // In order to fix that, if we have a varchar 255, we change it to TEXT.
+            // Zoho is internally capable of storing very long texts inside "single line" with characters limit,
+            // so it should not be an issue when synchronizing data. Only the structure will not match.
+            if ($type === 'string' && $length === 255) {
+                $type = 'text';
+                $length = null;
+            }
+
             if ($length) {
                 $options['length'] = $length;
             }
