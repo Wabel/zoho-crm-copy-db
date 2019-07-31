@@ -120,6 +120,8 @@ class LocalChangesTracker
         $triggerName = sprintf('TRG_%s_ONINSERT', $table->getName());
         $this->logger->info('Creating ' . $triggerName . ' trigger for table ' . $table->getName() . '...');
 
+        $tableNameQuoted = $this->connection->quote($table->getName());
+
         $sql = sprintf(
             '
             DROP TRIGGER IF EXISTS %s;
@@ -134,7 +136,7 @@ class LocalChangesTracker
               END IF;
             END;
             
-            ', $triggerName, $triggerName, $table->getName(), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()), $this->connection->quote($table->getName())
+            ', $triggerName, $triggerName, $table->getName(), $tableNameQuoted, $tableNameQuoted, $tableNameQuoted
         );
 
         $this->connection->exec($sql);
@@ -144,6 +146,8 @@ class LocalChangesTracker
     {
         $triggerName = sprintf('TRG_%s_ONDELETE', $table->getName());
         $this->logger->info('Creating ' . $triggerName . ' trigger for table ' . $table->getName() . '...');
+
+        $tableNameQuoted = $this->connection->quote($table->getName());
 
         $sql = sprintf(
             '
@@ -159,7 +163,7 @@ class LocalChangesTracker
               DELETE FROM local_update WHERE table_name = %s AND uid = OLD.uid;
             END;
             
-            ', $triggerName, $triggerName, $table->getName(), $this->connection->quote($table->getName()), $this->connection->quote($table->getName()), $this->connection->quote($table->getName())
+            ', $triggerName, $triggerName, $table->getName(), $tableNameQuoted, $tableNameQuoted, $tableNameQuoted
         );
 
         $this->connection->exec($sql);
@@ -172,6 +176,8 @@ class LocalChangesTracker
 
         $innerCode = '';
 
+        $tableNameQuoted = $this->connection->quote($table->getName());
+
         foreach ($table->getColumns() as $column) {
             if (in_array($column->getName(), ['id', 'uid'])) {
                 continue;
@@ -182,7 +188,7 @@ class LocalChangesTracker
                 IF NOT(NEW.%s <=> OLD.%s) THEN
                   REPLACE INTO local_update VALUES (%s, NEW.uid, %s);
                 END IF;
-            ', $columnName, $columnName, $this->connection->quote($table->getName()), $this->connection->quote($column->getName())
+            ', $columnName, $columnName, $tableNameQuoted, $this->connection->quote($column->getName())
             );
         }
 
