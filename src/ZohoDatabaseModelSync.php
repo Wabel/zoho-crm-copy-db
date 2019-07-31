@@ -110,10 +110,6 @@ class ZohoDatabaseModelSync
             $options = [];
             // Note: full list of types available here: https://www.zoho.com/crm/help/customization/custom-fields.html
             switch ($field->getType()) {
-            case 'fileupload':
-                $type = 'string';
-                $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 255;
-                break;
             case 'lookup':
                 $type = 'string';
                 $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 100;
@@ -139,12 +135,10 @@ class ZohoDatabaseModelSync
             case 'boolean':
                 $type = 'boolean';
                 break;
-            case 'textarea':
-                $type = 'text';
-                break;
             case 'bigint':
                 $type = 'bigint';
                 break;
+            case 'fileupload':
             case 'phone':
             case 'text':
             case 'url':
@@ -154,6 +148,7 @@ class ZohoDatabaseModelSync
                 $type = 'string';
                 $length = $field->getMaxlength() && $field->getMaxlength() > 0?$field->getMaxlength() : 255;
                 break;
+            case 'textarea':
             case 'multiselectlookup':
             case 'multiuserlookup':
             case 'multiselectpicklist':
