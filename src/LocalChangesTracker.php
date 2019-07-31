@@ -59,6 +59,33 @@ class LocalChangesTracker
         $dbalTableDiffService->createOrUpdateTable($localDelete);
     }
 
+    public function hasTriggersInsertUpdateDelete(Table $table)
+    {
+        $triggerInsertName = sprintf('TRG_%s_ONINSERT', $table->getName());
+        $triggerUpdateName = sprintf('TRG_%s_ONUPDATE', $table->getName());
+        $triggerDeleteName = sprintf('TRG_%s_ONDELETE', $table->getName());
+        $nbTriggers = 0;
+        $triggers = $this->connection->fetchAll("SHOW TRIGGERS LIKE '{$table->getName()}'");
+        foreach ($triggers as $trigger) {
+            if (in_array($trigger['Trigger'], [$triggerInsertName, $triggerUpdateName, $triggerDeleteName], true)) {
+                $nbTriggers++;
+            }
+        }
+        return $nbTriggers === 3;
+    }
+
+    public function hasTriggerInsertUuid(Table $table)
+    {
+        $triggerInsertName = sprintf('TRG_%s_SETUUIDBEFOREINSERT', $table->getName());
+        $triggers = $this->connection->fetchAll("SHOW TRIGGERS LIKE '{$table->getName()}'");
+        foreach ($triggers as $trigger) {
+            if ($trigger['Trigger'] === $triggerInsertName) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public function createUuidInsertTrigger(Table $table)
     {
         $triggerName = sprintf('TRG_%s_SETUUIDBEFOREINSERT', $table->getName());
