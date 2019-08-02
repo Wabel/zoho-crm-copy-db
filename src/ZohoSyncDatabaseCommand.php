@@ -278,7 +278,7 @@ class ZohoSyncDatabaseCommand extends Command
 
         $this->logger->notice('Starting to fetch Zoho data into local database...');
         foreach ($this->zohoDaos as $zohoDao) {
-            $this->logger->info(sprintf('Copying data into local for %s', get_class($zohoDao)));
+            $this->logger->notice(sprintf('Copying data into local for %s...', get_class($zohoDao)));
             $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync, $throwErrors);
         }
         $this->logger->notice('Zoho data successfully fetched.');

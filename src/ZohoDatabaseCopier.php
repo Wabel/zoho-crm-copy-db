@@ -145,7 +145,6 @@ class ZohoDatabaseCopier
 
         try {
             if ($incrementalSync) {
-                $this->logger->info("Copying incremental data for '$tableName'");
                 // Let's get the last modification date:
                 $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
                 $lastActivityTime = null;
@@ -158,15 +157,23 @@ class ZohoDatabaseCopier
 
                 if ($lastActivityTime !== null) {
                     $lastActivityTime = new \DateTime($lastActivityTime, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
-                    $this->logger->info('Last modified time: ' . $lastActivityTime->format(\DateTime::ATOM));
                     // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
                     $lastActivityTime->add(new \DateInterval('PT1S'));
                 }
 
+                if ($lastActivityTime) {
+                    $this->logger->info('Incremental copy from ' . $lastActivityTime->format(\DateTime::ATOM) . ' started');
+                } else {
+                    $this->logger->info('Incremental copy started');
+                }
+
+                $this->logger->info('Fetching the records to insert/update...');
                 $records = $dao->getRecords(null, null, null, $lastActivityTime);
+                $this->logger->info('Fetching the records to delete...');
                 $deletedRecords = $dao->getDeletedRecordIds($lastActivityTime);
             } else {
-                $this->logger->info("Copying FULL data for '$tableName'");
+                $this->logger->info('Full copy started');
+                $this->logger->info('Fetching the records to insert/update...');
                 $records = $dao->getRecords();
                 $deletedRecords = [];
             }
@@ -179,7 +186,7 @@ class ZohoDatabaseCopier
             }
             return;
         }
-        $this->logger->info('Fetched ' . count($records) . ' records');
+        $this->logger->info('Inserting/updating ' . count($records) . ' records...');
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
 
@@ -187,6 +194,11 @@ class ZohoDatabaseCopier
 
         $this->connection->beginTransaction();
 
+        $recordsModificationCounts = [
+            'insert' => 0,
+            'update' => 0,
+            'delete' => 0,
+        ];
         foreach ($records as $record) {
             $data = [];
             $types = [];
@@ -216,22 +228,22 @@ class ZohoDatabaseCopier
             $select->execute(['id' => $record->getZohoId()]);
             $result = $select->fetch(\PDO::FETCH_ASSOC);
             if ($result === false) {
-                $this->logger->debug("Inserting record with ID '" . $record->getZohoId() . "'.");
+                $this->logger->debug("Inserting record with ID '" . $record->getZohoId() . "'...");
 
                 $data['id'] = $record->getZohoId();
                 $types['id'] = 'string';
 
-                $this->connection->insert($tableName, $data, $types);
+                $recordsModificationCounts['insert'] += $this->connection->insert($tableName, $data, $types);
 
                 foreach ($this->listeners as $listener) {
                     $listener->onInsert($data, $dao);
                 }
             } else {
-                $this->logger->debug("Updating record with ID '" . $record->getZohoId() . "'.");
+                $this->logger->debug("Updating record with ID '" . $record->getZohoId() . "'...");
                 $identifier = ['id' => $record->getZohoId()];
                 $types['id'] = 'string';
 
-                $this->connection->update($tableName, $data, $identifier, $types);
+                $recordsModificationCounts['update'] += $this->connection->update($tableName, $data, $identifier, $types);
 
                 // Let's add the id for the update trigger
                 $data['id'] = $record->getZohoId();
@@ -240,10 +252,13 @@ class ZohoDatabaseCopier
                 }
             }
         }
+
+        $this->logger->info('Deleting ' . count($deletedRecords) . ' records...');
         $sqlStatementUid = 'select uid from ' . $this->connection->quoteIdentifier($tableName) . ' where id = :id';
         foreach ($deletedRecords as $deletedRecord) {
+            $this->logger->debug("Deleting record with ID '" . $deletedRecord->getEntityId() . "'...");
             $uid = $this->connection->fetchColumn($sqlStatementUid, ['id' => $deletedRecord->getEntityId()]);
-            $this->connection->delete($tableName, ['id' => $deletedRecord->getEntityId()]);
+            $recordsModificationCounts['delete'] += $this->connection->delete($tableName, ['id' => $deletedRecord->getEntityId()]);
             if ($twoWaysSync) {
                 // TODO: we could detect if there are changes to be updated to the server and try to warn with a log message
                 // Also, let's remove the newly created field (because of the trigger) to avoid looping back to Zoho
@@ -251,7 +266,12 @@ class ZohoDatabaseCopier
                 $this->connection->delete('local_update', ['table_name' => $tableName, 'uid' => $uid]);
             }
         }
-        $this->logger->info('Deleted ' . count($deletedRecords) . ' records');
+
+        $this->logger->notice(sprintf('Copy finished with %d item(s) inserted, %d item(s) updated and %d item(s) deleted.',
+            $recordsModificationCounts['insert'],
+            $recordsModificationCounts['update'],
+            $recordsModificationCounts['delete']
+        ));
 
         $this->connection->commit();
     }
