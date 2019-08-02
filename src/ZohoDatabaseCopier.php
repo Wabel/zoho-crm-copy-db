@@ -143,6 +143,8 @@ class ZohoDatabaseCopier
     {
         $tableName = ZohoDatabaseHelper::getTableName($dao, $this->prefix);
 
+        $totalRecords = 0;
+        $totalRecordsDeleted = 0;
         try {
             if ($incrementalSync) {
                 // Let's get the last modification date:
@@ -169,12 +171,18 @@ class ZohoDatabaseCopier
 
                 $this->logger->info('Fetching the records to insert/update...');
                 $records = $dao->getRecords(null, null, null, $lastActivityTime);
+                $totalRecords = count($records);
+                $this->logger->debug($totalRecords . ' records fetched.');
                 $this->logger->info('Fetching the records to delete...');
                 $deletedRecords = $dao->getDeletedRecordIds($lastActivityTime);
+                $totalRecordsDeleted = count($deletedRecords);
+                $this->logger->debug($totalRecordsDeleted . ' records fetched.');
             } else {
                 $this->logger->info('Full copy started');
                 $this->logger->info('Fetching the records to insert/update...');
                 $records = $dao->getRecords();
+                $totalRecords = count($records);
+                $this->logger->debug($totalRecords . ' records fetched.');
                 $deletedRecords = [];
             }
         } catch (ZCRMException $exception) {
@@ -186,7 +194,7 @@ class ZohoDatabaseCopier
             }
             return;
         }
-        $this->logger->info('Inserting/updating ' . count($records) . ' records...');
+        $this->logger->info('Inserting/updating ' . count($records) . ' records into table ' . $tableName . '...');
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
 
@@ -199,7 +207,14 @@ class ZohoDatabaseCopier
             'update' => 0,
             'delete' => 0,
         ];
+
+        $logOffset = $totalRecords >= 500 ? 100 : 50;
+        $processedRecords = 0;
         foreach ($records as $record) {
+            if (($processedRecords % $logOffset) === 0) {
+                $this->logger->info($processedRecords . '/' . $totalRecords . ' records processed');
+            }
+            ++$processedRecords;
             $data = [];
             $types = [];
             foreach ($table->getColumns() as $column) {
@@ -253,9 +268,14 @@ class ZohoDatabaseCopier
             }
         }
 
-        $this->logger->info('Deleting ' . count($deletedRecords) . ' records...');
+        $this->logger->info('Deleting ' . count($deletedRecords) . ' records into table ' . $tableName . '...');
         $sqlStatementUid = 'select uid from ' . $this->connection->quoteIdentifier($tableName) . ' where id = :id';
+        $processedRecords = 0;
         foreach ($deletedRecords as $deletedRecord) {
+            if (($processedRecords % $logOffset) === 0) {
+                $this->logger->info($processedRecords . '/' . $totalRecords . ' records processed');
+            }
+            ++$processedRecords;
             $this->logger->debug("Deleting record with ID '" . $deletedRecord->getEntityId() . "'...");
             $uid = $this->connection->fetchColumn($sqlStatementUid, ['id' => $deletedRecord->getEntityId()]);
             $recordsModificationCounts['delete'] += $this->connection->delete($tableName, ['id' => $deletedRecord->getEntityId()]);
