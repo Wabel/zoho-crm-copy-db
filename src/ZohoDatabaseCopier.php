@@ -194,7 +194,7 @@ class ZohoDatabaseCopier
             }
             return;
         }
-        $this->logger->info('Inserting/updating ' . count($records) . ' records into table ' . $tableName . '...');
+        $this->logger->info('Inserting/updating ' . $totalRecords . ' records into table ' . $tableName . '...');
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
 
@@ -268,12 +268,13 @@ class ZohoDatabaseCopier
             }
         }
 
-        $this->logger->info('Deleting ' . count($deletedRecords) . ' records into table ' . $tableName . '...');
+        $this->logger->info('Deleting ' . $totalRecordsDeleted . ' records into table ' . $tableName . '...');
         $sqlStatementUid = 'select uid from ' . $this->connection->quoteIdentifier($tableName) . ' where id = :id';
         $processedRecords = 0;
+        $logOffset = $totalRecordsDeleted >= 500 ? 100 : 50;
         foreach ($deletedRecords as $deletedRecord) {
             if (($processedRecords % $logOffset) === 0) {
-                $this->logger->info($processedRecords . '/' . $totalRecords . ' records processed');
+                $this->logger->info($processedRecords . '/' . $totalRecordsDeleted . ' records processed');
             }
             ++$processedRecords;
             $this->logger->debug("Deleting record with ID '" . $deletedRecord->getEntityId() . "'...");

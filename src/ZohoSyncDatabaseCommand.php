@@ -129,6 +129,7 @@ class ZohoSyncDatabaseCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->logger->addLogger(new DateTimeFormatter(new ConsoleLogger($output)));
+        $this->logger->notice('Command ZohoSyncDatabase started');
         try {
             if ($this->lock) {
                 $this->lock->acquireLock();
@@ -195,6 +196,7 @@ class ZohoSyncDatabaseCommand extends Command
         } catch (LockException $e) {
             $this->logger->error('Could not start zoho:copy-db copy command. Another zoho:copy-db copy command is already running.');
         }
+        $this->logger->notice('Command ZohoSyncDatabase finished');
     }
 
     /**
@@ -237,6 +239,7 @@ class ZohoSyncDatabaseCommand extends Command
             //To have more module which is use time of modification (createdTime or lastActivityTime).
             //use an array of Excluded Dao by full namespace
             if ($this->excludedZohoDao && in_array(get_class($zohoDao), $this->excludedZohoDao)) {
+                $this->logger->debug(sprintf('%s has been excluded from generation', get_class($zohoDao)));
                 continue;
             }
             $this->zohoDaos [] = $zohoDao;
