@@ -125,7 +125,8 @@ class ZohoSyncDatabaseCommand extends Command
             ->addOption('clear-logs', null, InputOption::VALUE_NONE, 'Clear logs file at startup')
             ->addOption('dump-logs', null, InputOption::VALUE_NONE, 'Dump logs into console when command finishes')
             ->addOption('continue-on-error', null, InputOption::VALUE_NONE, 'Don\'t stop the command on errors')
-            ->addOption('fetch-bulk', null, InputOption::VALUE_NONE, 'Fetch the data module by module using bulk read API');
+            ->addOption('fetch-bulk', null, InputOption::VALUE_NONE, 'Fetch the data module by module using bulk read API')
+            ->addOption('modified-since', null, InputOption::VALUE_OPTIONAL, 'Fetch the data since a particular date (ISO 8601)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -284,12 +285,17 @@ class ZohoSyncDatabaseCommand extends Command
             $incremental = true;
         }
 
+        $modifiedSince = null;
+        if ($input->getOption('modified-since')) {
+            $modifiedSince = $input->getOption('modified-since');
+        }
+
         $twoWaysSync = !$input->getOption('fetch-only');
 
         $this->logger->notice('Starting to fetch Zoho data into local database...');
         foreach ($this->zohoDaos as $zohoDao) {
             $this->logger->notice(sprintf('Copying data into local for %s...', get_class($zohoDao)));
-            $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync, $throwErrors);
+            $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync, $throwErrors, $modifiedSince);
         }
         $this->logger->notice('Zoho data successfully fetched.');
     }

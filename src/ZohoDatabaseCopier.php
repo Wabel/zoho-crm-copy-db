@@ -135,33 +135,39 @@ class ZohoDatabaseCopier
      * @param bool $incrementalSync Whether we synchronize only the modified files or everything.
      * @param bool $twoWaysSync
      * @param bool $throwErrors
+     * @param string $modifiedSince
      *
      * @throws \Doctrine\DBAL\DBALException
      * @throws \Doctrine\DBAL\Schema\SchemaException
      * @throws \Wabel\Zoho\CRM\Exception\ZohoCRMResponseException
      */
-    public function fetchFromZoho(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true, $throwErrors = true)
+    public function fetchFromZoho(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true, $throwErrors = true, $modifiedSince = null)
     {
         $tableName = ZohoDatabaseHelper::getTableName($dao, $this->prefix);
 
         $totalRecords = 0;
         $totalRecordsDeleted = 0;
+
         try {
             if ($incrementalSync) {
                 // Let's get the last modification date:
                 $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
                 $lastActivityTime = null;
-                if ($tableDetail->hasColumn('modifiedTime')) {
-                    $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
-                }
-                if (!$lastActivityTime && $tableDetail->hasColumn('createdTime')) {
-                    $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
-                }
+                if ($modifiedSince) {
+                    $lastActivityTime = new \DateTime($modifiedSince);
+                } else {
+                    if ($tableDetail->hasColumn('modifiedTime')) {
+                        $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
+                    }
+                    if (!$lastActivityTime && $tableDetail->hasColumn('createdTime')) {
+                        $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
+                    }
 
-                if ($lastActivityTime !== null) {
-                    $lastActivityTime = new \DateTime($lastActivityTime, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
-                    // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
-                    $lastActivityTime->add(new \DateInterval('PT1S'));
+                    if ($lastActivityTime !== null) {
+                        $lastActivityTime = new \DateTime($lastActivityTime, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
+                        // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
+                        $lastActivityTime->add(new \DateInterval('PT1S'));
+                    }
                 }
 
                 if ($lastActivityTime) {
