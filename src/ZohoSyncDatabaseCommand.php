@@ -82,26 +82,27 @@ class ZohoSyncDatabaseCommand extends Command
 
 
     /**
-     * @param ZohoDatabaseModelSync    $zohoDatabaseModelSync
-     * @param ZohoDatabaseCopier       $zohoDatabaseCopier
-     * @param ZohoDatabasePusher       $zohoDatabaseSync
+     * @param ZohoDatabaseModelSync $zohoDatabaseModelSync
+     * @param ZohoDatabaseCopier $zohoDatabaseCopier
+     * @param ZohoDatabasePusher $zohoDatabaseSync
      * @param EntitiesGeneratorService $zohoEntitiesGenerator The Zoho Dao and Beans generator
-     * @param ZohoClient               $zohoClient
-     * @param string                   $pathZohoDaos          Tht path where we need to generate the Daos.
-     * @param string                   $namespaceZohoDaos     Daos namespace
-     * @param MultiLogger              $logger
-     * @param Lock                     $lock                  A lock that can be used to avoid running the same command (copy) twice at the same time
-     * @param string[]                 $excludedZohoDao       To exclude Dao and or solve Dao which can create ZohoResponse Error
+     * @param ZohoClient $zohoClient
+     * @param string $pathZohoDaos Tht path where we need to generate the Daos.
+     * @param string $namespaceZohoDaos Daos namespace
+     * @param MultiLogger $logger
+     * @param Lock $lock A lock that can be used to avoid running the same command (copy) twice at the same time
+     * @param string[] $excludedZohoDao To exclude Dao and or solve Dao which can create ZohoResponse Error
      */
     public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync,
-        EntitiesGeneratorService $zohoEntitiesGenerator, ZohoClient $zohoClient,
-        $pathZohoDaos, $namespaceZohoDaos, MultiLogger $logger, Lock $lock = null, $excludedZohoDao = []
-    ) {
+                                EntitiesGeneratorService $zohoEntitiesGenerator, ZohoClient $zohoClient,
+                                $pathZohoDaos, $namespaceZohoDaos, MultiLogger $logger, Lock $lock = null, $excludedZohoDao = []
+    )
+    {
         parent::__construct();
         $this->zohoDatabaseModelSync = $zohoDatabaseModelSync;
         $this->zohoDatabaseCopier = $zohoDatabaseCopier;
         $this->zohoDatabaseSync = $zohoDatabaseSync;
-        $this->zohoEntitiesGenerator =  $zohoEntitiesGenerator;
+        $this->zohoEntitiesGenerator = $zohoEntitiesGenerator;
         $this->zohoClient = $zohoClient;
         $this->pathZohoDaos = $pathZohoDaos;
         $this->namespaceZohoDaos = $namespaceZohoDaos;
@@ -123,7 +124,8 @@ class ZohoSyncDatabaseCommand extends Command
             ->addOption('log-path', null, InputOption::VALUE_OPTIONAL, 'Set the path of logs file')
             ->addOption('clear-logs', null, InputOption::VALUE_NONE, 'Clear logs file at startup')
             ->addOption('dump-logs', null, InputOption::VALUE_NONE, 'Dump logs into console when command finishes')
-            ->addOption('continue-on-error', null, InputOption::VALUE_NONE, 'Don\'t stop the command on errors');
+            ->addOption('continue-on-error', null, InputOption::VALUE_NONE, 'Don\'t stop the command on errors')
+            ->addOption('fetch-bulk', null, InputOption::VALUE_NONE, 'Fetch the data module by module using bulk read API');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -153,7 +155,7 @@ class ZohoSyncDatabaseCommand extends Command
                 }
             }
 
-            if(!$input->getOption('limit')) {
+            if (!$input->getOption('limit')) {
                 ini_set('memory_limit', '-1');
             }
 
@@ -167,12 +169,17 @@ class ZohoSyncDatabaseCommand extends Command
 
             $this->syncModel($input);
 
-            if (!$input->getOption('push-only')) {
+            if ($input->getOption('fetch-bulk')) {
                 $this->fetchUserDb();
-                $this->fetchDb($input);
-            }
-            if (!$input->getOption('fetch-only')) {
-                $this->pushDb();
+                $this->fetchDbInBulk($input);
+            } else {
+                if (!$input->getOption('push-only')) {
+                    $this->fetchUserDb();
+                    $this->fetchDb($input);
+                }
+                if (!$input->getOption('fetch-only')) {
+                    $this->pushDb();
+                }
             }
 
             if ($input->getOption('log-path') && $input->getOption('dump-logs')) {
@@ -257,12 +264,12 @@ class ZohoSyncDatabaseCommand extends Command
         $this->zohoDatabaseCopier->fetchUserFromZoho();
         $this->logger->notice('Zoho users data successfully copied.');
     }
-    
-    
+
+
     /**
      * Run the fetch Db command.
      *
-     * @param InputInterface  $input
+     * @param InputInterface $input
      */
     private function fetchDb(InputInterface $input)
     {
@@ -287,6 +294,22 @@ class ZohoSyncDatabaseCommand extends Command
         $this->logger->notice('Zoho data successfully fetched.');
     }
 
+
+    /**
+     * Run the fetch Db command.
+     *
+     * @param InputInterface $input
+     */
+    private function fetchDbInBulk(InputInterface $input)
+    {
+        $this->logger->notice('Starting to bulk fetch Zoho data into local database...');
+        foreach ($this->zohoDaos as $zohoDao) {
+            $this->logger->notice(sprintf('Copying data into local for %s...', get_class($zohoDao)));
+            $this->zohoDatabaseCopier->fetchFromZohoInBulk($zohoDao);
+        }
+        $this->logger->notice('Zoho data successfully fetched.');
+    }
+
     /**
      * Run the push Db command.
      */
@@ -294,7 +317,7 @@ class ZohoSyncDatabaseCommand extends Command
     {
         $this->logger->notice('Starting to push data from local database into Zoho CRM...');
         foreach ($this->zohoDaos as $zohoDao) {
-            if($zohoDao->getFieldFromFieldName('createdTime')) {
+            if ($zohoDao->getFieldFromFieldName('createdTime')) {
                 $this->zohoDatabaseSync->pushToZoho($zohoDao);
             }
         }

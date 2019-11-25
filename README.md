@@ -119,3 +119,20 @@ $listener = new MyListener();
 $databaseCopier = new ZohoDatabaseCopier($connection, "my_prefix_", [ $listener ]);
 ```
 
+Versions
+--------
+
+### 3.2
+This version adds an option `fetch-bulk` that will loop over all the modules in order to populate the data in each tables. This option will use the Bulk Read API v2.  
+For each modules, the following actions will be executed:
+
+1. Send a request to create a bulk job
+2. Every 15 seconds, check the status of the job. If ready, go to step 3
+3. Download the CSV results
+4. Insert the results into the module's table
+5. If more results are expected, goes back to step 1
+
+Maximum 200000 records are fetched per API call. In case of error, the script pass to the next module.  
+Logging is enabled.
+
+Developer note: This new option has been developed quickly in order to migrate from API v1 to v2 (EOL december 2019). The code is dirty, but everything works.
