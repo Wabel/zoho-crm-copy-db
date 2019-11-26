@@ -335,7 +335,7 @@ class ZohoDatabaseCopier
         while (true) {
             // Step 1: Create a bulk read job
             $this->logger->info('Creating read job for module ' . $apiModuleName . ' and page ' . $page . '...');
-            $response = $client->request('POST', 'https://www.zohoapis.com/crm/bulk/v2/read', [
+            $response = $client->request('POST', 'https://' . (ZOHO_CRM_SANDBOX === 'true' ? 'sandbox' : 'www') . '.zohoapis.com/crm/bulk/v2/read', [
                 'http_errors' => false,
                 'headers' => [
                     'Authorization' => 'Zoho-oauthtoken ' . $oauthToken
@@ -369,7 +369,7 @@ class ZohoDatabaseCopier
             $jobDetails = null;
             while (true) {
                 $this->logger->info('Checking job ' . $jobId . ' status for module ' . $apiModuleName . ' and page ' . $page . '...');
-                $response = $client->request('GET', 'https://www.zohoapis.com/crm/bulk/v2/read/' . $jobId, [
+                $response = $client->request('GET', 'https://' . (ZOHO_CRM_SANDBOX === 'true' ? 'sandbox' : 'www') . '.zohoapis.com/crm/bulk/v2/read/' . $jobId, [
                     'http_errors' => false,
                     'headers' => [
                         'Authorization' => 'Zoho-oauthtoken ' . $oauthToken
@@ -416,7 +416,7 @@ class ZohoDatabaseCopier
             $jobCsvFile = '/tmp/job_extract/' . $jobDetails['data'][0]['id'] . '.csv';
             $canProcessCsv = false;
 
-            $response = $client->request('GET', 'https://www.zohoapis.com/crm/bulk/v2/read/' . $jobId . '/result', [
+            $response = $client->request('GET', 'https://' . (ZOHO_CRM_SANDBOX === 'true' ? 'sandbox' : 'www') . '.zohoapis.com/crm/bulk/v2/read/' . $jobId . '/result', [
                 'http_errors' => false,
                 'headers' => [
                     'Authorization' => 'Zoho-oauthtoken ' . $oauthToken
