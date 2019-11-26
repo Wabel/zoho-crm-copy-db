@@ -176,17 +176,17 @@ class ZohoDatabaseCopier
                     $this->logger->info(sprintf('Incremental copy started for module %s', $dao->getPluralModuleName()));
                 }
 
-                $this->logger->info(sprintf('Fetching the records to insert/update for module %s...', $dao->getPluralModuleName()));
+                $this->logger->notice(sprintf('Fetching the records to insert/update for module %s...', $dao->getPluralModuleName()));
                 $records = $dao->getRecords(null, null, null, $lastActivityTime);
                 $totalRecords = count($records);
                 $this->logger->debug($totalRecords . ' records fetched.');
-                $this->logger->info(sprintf('Fetching the records to delete for module %s...', $dao->getPluralModuleName()));
+                $this->logger->notice(sprintf('Fetching the records to delete for module %s...', $dao->getPluralModuleName()));
                 $deletedRecords = $dao->getDeletedRecordIds($lastActivityTime);
                 $totalRecordsDeleted = count($deletedRecords);
                 $this->logger->debug($totalRecordsDeleted . ' records fetched.');
             } else {
                 $this->logger->info(sprintf('Full copy started for module %s', $dao->getPluralModuleName()));
-                $this->logger->info(sprintf('Fetching the records to insert/update for module ...%s', $dao->getPluralModuleName()));
+                $this->logger->notice(sprintf('Fetching the records to insert/update for module ...%s', $dao->getPluralModuleName()));
                 $records = $dao->getRecords();
                 $totalRecords = count($records);
                 $this->logger->debug($totalRecords . ' records fetched.');
