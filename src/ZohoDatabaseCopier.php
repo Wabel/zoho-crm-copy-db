@@ -72,7 +72,7 @@ class ZohoDatabaseCopier
     {
         $users = $this->zohoUserService->getUsers();
         $tableName = 'users';
-        $this->logger->info('Fetched ' . count($users) . ' records');
+        $this->logger->info('Fetched ' . count($users) . ' records for table ' . $tableName);
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
 
@@ -113,14 +113,14 @@ class ZohoDatabaseCopier
             $select->execute(['id' => $user->getId()]);
             $result = $select->fetch(\PDO::FETCH_ASSOC);
             if ($result === false && $data) {
-                $this->logger->debug("Inserting record with ID '" . $user->getId() . "'.");
+                $this->logger->debug(sprintf('Inserting record with ID \'%s\' in table %s...', $user->getId(), $tableName));
 
                 $data['id'] = $user->getId();
                 $types['id'] = 'string';
 
                 $this->connection->insert($tableName, $data, $types);
             } elseif ($data) {
-                $this->logger->debug("Updating record with ID '" . $user->getId() . "'.");
+                $this->logger->debug(sprintf('Updating record with ID \'%s\' in table %s...', $user->getId(), $tableName));
                 $identifier = ['id' => $user->getId()];
                 $types['id'] = 'string';
                 $this->connection->update($tableName, $data, $identifier, $types);
@@ -171,29 +171,29 @@ class ZohoDatabaseCopier
                 }
 
                 if ($lastActivityTime) {
-                    $this->logger->info('Incremental copy from ' . $lastActivityTime->format(\DateTime::ATOM) . ' started');
+                    $this->logger->info(sprintf('Incremental copy from %s started for module %s', $lastActivityTime->format(\DateTime::ATOM), $dao->getPluralModuleName()));
                 } else {
-                    $this->logger->info('Incremental copy started');
+                    $this->logger->info(sprintf('Incremental copy started for module %s', $dao->getPluralModuleName()));
                 }
 
-                $this->logger->info('Fetching the records to insert/update...');
+                $this->logger->info(sprintf('Fetching the records to insert/update for module %s...', $dao->getPluralModuleName()));
                 $records = $dao->getRecords(null, null, null, $lastActivityTime);
                 $totalRecords = count($records);
                 $this->logger->debug($totalRecords . ' records fetched.');
-                $this->logger->info('Fetching the records to delete...');
+                $this->logger->info(sprintf('Fetching the records to delete for module %s...', $dao->getPluralModuleName()));
                 $deletedRecords = $dao->getDeletedRecordIds($lastActivityTime);
                 $totalRecordsDeleted = count($deletedRecords);
                 $this->logger->debug($totalRecordsDeleted . ' records fetched.');
             } else {
-                $this->logger->info('Full copy started');
-                $this->logger->info('Fetching the records to insert/update...');
+                $this->logger->info(sprintf('Full copy started for module %s', $dao->getPluralModuleName()));
+                $this->logger->info(sprintf('Fetching the records to insert/update for module ...%s', $dao->getPluralModuleName()));
                 $records = $dao->getRecords();
                 $totalRecords = count($records);
                 $this->logger->debug($totalRecords . ' records fetched.');
                 $deletedRecords = [];
             }
         } catch (ZCRMException $exception) {
-            $this->logger->error('Error when getting records for module ' . $tableName . ': ' . $exception->getMessage(), [
+            $this->logger->error('Error when getting records for module ' . $dao->getPluralModuleName() . ': ' . $exception->getMessage(), [
                 'exception' => $exception
             ]);
             if ($throwErrors) {
@@ -201,7 +201,7 @@ class ZohoDatabaseCopier
             }
             return;
         }
-        $this->logger->info('Inserting/updating ' . $totalRecords . ' records into table ' . $tableName . '...');
+        $this->logger->info(sprintf('Inserting/updating %s records into table %s...', $totalRecords, $tableName));
 
         $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
 
@@ -219,7 +219,7 @@ class ZohoDatabaseCopier
         $processedRecords = 0;
         foreach ($records as $record) {
             if (($processedRecords % $logOffset) === 0) {
-                $this->logger->info($processedRecords . '/' . $totalRecords . ' records processed');
+                $this->logger->info(sprintf('%d/%s records processed for module %s', $processedRecords, $totalRecords, $dao->getPluralModuleName()));
             }
             ++$processedRecords;
             $data = [];
@@ -227,30 +227,29 @@ class ZohoDatabaseCopier
             foreach ($table->getColumns() as $column) {
                 if (in_array($column->getName(), ['id', 'uid'])) {
                     continue;
-                } else {
-                    $field = $dao->getFieldFromFieldName($column->getName());
-                    if (!$field) {
-                        continue;
-                    }
-                    $getterName = $field->getGetter();
-                    $dataValue = $record->$getterName();
-                    $finalFieldData = null;
-                    if ($dataValue instanceof ZCRMRecord) {
-                        $finalFieldData = $dataValue->getEntityId();
-                    } elseif (is_array($dataValue)) {
-                        $finalFieldData = implode(';', $dataValue);
-                    } else {
-                        $finalFieldData = $dataValue;
-                    }
-                    $data[$column->getName()] = $finalFieldData;
-                    $types[$column->getName()] = $column->getType()->getName();
                 }
+                $field = $dao->getFieldFromFieldName($column->getName());
+                if (!$field) {
+                    continue;
+                }
+                $getterName = $field->getGetter();
+                $dataValue = $record->$getterName();
+                $finalFieldData = null;
+                if ($dataValue instanceof ZCRMRecord) {
+                    $finalFieldData = $dataValue->getEntityId();
+                } elseif (is_array($dataValue)) {
+                    $finalFieldData = implode(';', $dataValue);
+                } else {
+                    $finalFieldData = $dataValue;
+                }
+                $data[$column->getName()] = $finalFieldData;
+                $types[$column->getName()] = $column->getType()->getName();
             }
 
             $select->execute(['id' => $record->getZohoId()]);
             $result = $select->fetch(\PDO::FETCH_ASSOC);
             if ($result === false) {
-                $this->logger->debug("Inserting record with ID '" . $record->getZohoId() . "'...");
+                $this->logger->debug(sprintf('Inserting record with ID \'%s\' in table %s...', $record->getZohoId(), $tableName));
 
                 $data['id'] = $record->getZohoId();
                 $types['id'] = 'string';
@@ -261,7 +260,7 @@ class ZohoDatabaseCopier
                     $listener->onInsert($data, $dao);
                 }
             } else {
-                $this->logger->debug("Updating record with ID '" . $record->getZohoId() . "'...");
+                $this->logger->debug(sprintf('Updating record with ID \'%s\' in table %s...', $record->getZohoId(), $tableName));
                 $identifier = ['id' => $record->getZohoId()];
                 $types['id'] = 'string';
 
@@ -275,16 +274,16 @@ class ZohoDatabaseCopier
             }
         }
 
-        $this->logger->info('Deleting ' . $totalRecordsDeleted . ' records into table ' . $tableName . '...');
+        $this->logger->info(sprintf('Deleting %d records from table %s...', $totalRecordsDeleted, $tableName));
         $sqlStatementUid = 'select uid from ' . $this->connection->quoteIdentifier($tableName) . ' where id = :id';
         $processedRecords = 0;
         $logOffset = $totalRecordsDeleted >= 500 ? 100 : 50;
         foreach ($deletedRecords as $deletedRecord) {
             if (($processedRecords % $logOffset) === 0) {
-                $this->logger->info($processedRecords . '/' . $totalRecordsDeleted . ' records processed');
+                $this->logger->info(sprintf('%d/%d records processed for module %s', $processedRecords, $totalRecordsDeleted, $dao->getPluralModuleName()));
             }
             ++$processedRecords;
-            $this->logger->debug("Deleting record with ID '" . $deletedRecord->getEntityId() . "'...");
+            $this->logger->debug(sprintf('Deleting record with ID \'%s\' in table %s...', $deletedRecord->getEntityId(), $tableName));
             $uid = $this->connection->fetchColumn($sqlStatementUid, ['id' => $deletedRecord->getEntityId()]);
             $recordsModificationCounts['delete'] += $this->connection->delete($tableName, ['id' => $deletedRecord->getEntityId()]);
             if ($twoWaysSync) {

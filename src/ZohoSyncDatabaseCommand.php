@@ -15,7 +15,6 @@ use Wabel\Zoho\CRM\ZohoClient;
 use Logger\Formatters\DateTimeFormatter;
 use Mouf\Utils\Log\Psr\MultiLogger;
 use Wabel\Zoho\CRM\Request\Response;
-use zcrmsdk\crm\utility\ZCRMConfigUtil;
 
 class ZohoSyncDatabaseCommand extends Command
 {
@@ -251,7 +250,7 @@ class ZohoSyncDatabaseCommand extends Command
                 continue;
             }
             $this->zohoDaos [] = $zohoDao;
-            $this->logger->info(sprintf('%s has been created', get_class($zohoDao)));
+            $this->logger->info(sprintf('%s has been created for module %s', get_class($zohoDao), $zohoDao->getPluralModuleName()));
         }
         $this->logger->notice('Finished to create all the Zoho daos.');
     }
@@ -294,7 +293,7 @@ class ZohoSyncDatabaseCommand extends Command
 
         $this->logger->notice('Starting to fetch Zoho data into local database...');
         foreach ($this->zohoDaos as $zohoDao) {
-            $this->logger->notice(sprintf('Copying data into local for %s...', get_class($zohoDao)));
+            $this->logger->notice(sprintf('Copying data into local for module %s...', $zohoDao->getPluralModuleName()));
             $this->zohoDatabaseCopier->fetchFromZoho($zohoDao, $incremental, $twoWaysSync, $throwErrors, $modifiedSince);
         }
         $this->logger->notice('Zoho data successfully fetched.');
@@ -310,7 +309,7 @@ class ZohoSyncDatabaseCommand extends Command
     {
         $this->logger->notice('Starting to bulk fetch Zoho data into local database...');
         foreach ($this->zohoDaos as $zohoDao) {
-            $this->logger->notice(sprintf('Copying data into local for %s...', get_class($zohoDao)));
+            $this->logger->notice(sprintf('Copying data into local for module %s...', $zohoDao->getPluralModuleName()));
             $this->zohoDatabaseCopier->fetchFromZohoInBulk($zohoDao);
         }
         $this->logger->notice('Zoho data successfully fetched.');
