@@ -8,6 +8,7 @@ use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 use Wabel\Zoho\CRM\ZohoBeanInterface;
+use zcrmsdk\crm\api\response\EntityResponse;
 
 /**
  * Description of ZohoDatabasePusher.
@@ -101,6 +102,7 @@ class ZohoDatabasePusher
                             'table_name' => $tableName
                         ]);
                     $recordsToUpdateResults = $recordsToUpdateQuery->execute()->fetchAll();
+                    $this->logger->info(sprintf('Processing %s records to update...', count($recordsToUpdateResults)));
                     foreach ($recordsToUpdateResults as $result) {
                         $recordQuery = $this->connection->createQueryBuilder();
                         $recordQuery
@@ -183,6 +185,7 @@ class ZohoDatabasePusher
                             'table_name' => $tableName
                         ]);
                     $recordsToInsertResults = $recordsToInsertQuery->execute()->fetchAll();
+                    $this->logger->info(sprintf('Processing %s records to insert...', count($recordsToInsertResults)));
                     foreach ($recordsToInsertResults as $result) {
                         $recordQuery = $this->connection->createQueryBuilder();
                         $recordQuery
