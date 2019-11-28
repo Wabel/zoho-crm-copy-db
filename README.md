@@ -144,7 +144,7 @@ This version also includes multiple on the structure of the tracking tables and 
 The tracking table now have a column error, that can indicate what is the error if something went wrong when pushing it.  
 The logging is still working and will display the same error.
 
-Plus, many changes in teh algorithms have been made to fix some issues:
+Plus, many changes in the algorithms have been made to fix some issues:
 
 * If a row with an UID is not found in a particular table, it doesn't go in infinite loop anymore.
 * If a field_name (local_update) is not found in a particular table, a correct error message is logged.
