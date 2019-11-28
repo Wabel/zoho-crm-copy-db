@@ -235,37 +235,53 @@ class ZohoDatabasePusher
      */
     private function sendDataToZohoCleanLocal(AbstractZohoDao $zohoDao, array $zohoBeans, $rowsDeleted, $update = false)
     {
+        $local_table = $update ? 'local_update' : 'local_insert';
         $tableName = ZohoDatabaseHelper::getTableName($zohoDao, $this->prefix);
-        $zohoDao->save($zohoBeans);
-        if (!$update) {
-            foreach ($zohoBeans as $uid => $zohoBean) {
-                $countResult = (int)$this->connection->fetchColumn('select count(id) from ' . $tableName . ' where id = :id', ['id' => $zohoBean->getZohoId()]);
-                //If the sent data were duplicates Zoho can merged so we need to check if the Zoho ID already exist.
-                if ($countResult === 0) {
-                    // ID not exist we can update the new row with the Zoho ID
-                    $this->connection->beginTransaction();
-                    $this->connection->update($tableName, ['id' => $zohoBean->getZohoId()], ['uid' => $uid]);
-                    $this->connection->delete('local_insert', ['table_name' => $tableName, 'uid' => $uid]);
-                    $this->connection->commit();
+        $entityResponses = $zohoDao->save($zohoBeans);
+        $responseKey = 0;
+        foreach ($zohoBeans as $uid => $zohoBean) {
+            $response = $entityResponses[$responseKey]->getResponseJSON();
+            if (strtolower($response['code']) === 'success') {
+                if ($update) {
+                    $this->logger->debug(sprintf('Updated successfully the record with uid %s (id \'%s\') from the table %s', $uid, $zohoBean->getZohoId(), $tableName));
+                    $this->connection->executeQuery(
+                        'DELETE FROM local_update WHERE uid LIKE :uid AND table_name = :table_name AND error IS NULL',
+                        [
+                            'uid' => $uid,
+                            'table_name' => $tableName
+                        ]
+                    );
                 } else {
-                    //ID already exist we need to delete the duplicate row.
-                    $this->connection->beginTransaction();
-                    $this->connection->delete($tableName, ['uid' => $uid]);
-                    $this->connection->delete('local_insert', ['table_name' => $tableName, 'uid' => $uid]);
-                    $this->connection->commit();
+                    $countResult = (int)$this->connection->fetchColumn('select count(id) from ' . $tableName . ' where id = :id', ['id' => $zohoBean->getZohoId()]);
+                    //If the sent data were duplicates Zoho can merged so we need to check if the Zoho ID already exist.
+                    if ($countResult === 0) {
+                        // ID not exist we can update the new row with the Zoho ID
+                        $this->connection->beginTransaction();
+                        $this->connection->update($tableName, ['id' => $zohoBean->getZohoId()], ['uid' => $uid]);
+                        $this->connection->delete('local_insert', ['table_name' => $tableName, 'uid' => $uid]);
+                        $this->connection->commit();
+                        $this->logger->debug(sprintf('Inserted successfully the record with uid %s (id \'%s\') from the table %s', $uid, $zohoBean->getZohoId(), $tableName));
+                    } else {
+                        //ID already exist we need to delete the duplicate row.
+                        $this->connection->beginTransaction();
+                        $this->connection->delete($tableName, ['uid' => $uid]);
+                        $this->connection->delete('local_insert', ['table_name' => $tableName, 'uid' => $uid]);
+                        $this->connection->commit();
+                        $this->logger->warning(sprintf('Duplicate record found when inserting record with uid %s from the table %s. ID updated: %s. UID deleted: %s', $uid, $tableName, $zohoBean->getZohoId(), $uid));
+                    }
                 }
-            }
-        } else {
-            $this->connection->executeQuery(
-                'DELETE FROM local_update WHERE uid IN (:rowsDeleted) AND table_name = :table_name AND error IS NULL',
-                [
-                    'rowsDeleted' => $rowsDeleted,
+            } else {
+                $errorMessage = sprintf('An error occurred when %s record with uid %s from table %s into Zoho: %s', ($update ? 'updating' : 'inserting'), $uid, $tableName, json_encode($response));
+                $this->logger->error($errorMessage);
+                $this->connection->update($local_table, [
+                    'error' => $errorMessage,
+                    'errorTime' => date('Y-m-d H:i:s')
+                ], [
+                    'uid' => $uid,
                     'table_name' => $tableName
-                ],
-                [
-                    'rowsDeleted' => Connection::PARAM_INT_ARRAY,
-                ]
-            );
+                ]);
+            }
+            $responseKey++;
         }
     }
 
