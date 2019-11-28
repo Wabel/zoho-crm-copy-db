@@ -119,3 +119,38 @@ $listener = new MyListener();
 $databaseCopier = new ZohoDatabaseCopier($connection, "my_prefix_", [ $listener ]);
 ```
 
+Versions
+--------
+
+### 3.2
+
+**Bulk**
+
+This version adds an option `fetch-bulk` that will loop over all the modules in order to populate the data in each tables. This option will use the Bulk Read API v2.  
+For each modules, the following actions will be executed:
+
+1. Send a request to create a bulk job
+2. Every 15 seconds, check the status of the job. If ready, go to step 3
+3. Download the CSV results
+4. Insert the results into the module's table
+5. If more results are expected, goes back to step 1
+
+Maximum 200000 records are fetched per API call. In case of error, the script pass to the next module.  
+Logging is enabled.
+
+**Algorithms and error logging**
+
+This version also includes multiple on the structure of the tracking tables and on the way data are pushed to Zoho.  
+The tracking table now have a column error, that can indicate what is the error if something went wrong when pushing it.  
+The logging is still working and will display the same error.
+
+Plus, many changes in the algorithms have been made to fix some issues:
+
+* If a row with an UID is not found in a particular table, it doesn't go in infinite loop anymore.
+* If a field_name (local_update) is not found in a particular table, a correct error message is logged.
+* Changed the algorithm when updating a record, in order to send to Zoho all the fields that have been updated. (Previously the algorithm took only the fields in the first 200 records and deleted the other...)
+* In case of error after sending the request to Zoho, the message is correctly logged.
+* Added a log message when inserting a record but Zoho merged it internally (previously it was still done, but in silent, with no message).
+
+
+Developer note: This new option has been developed quickly in order to migrate from API v1 to v2 (EOL december 2019). The code is dirty, but everything works.

@@ -39,17 +39,23 @@ class LocalChangesTracker
         $localUpdate->addColumn('table_name', 'string', ['length' => 100]);
         $localUpdate->addColumn('uid', 'string', ['length' => 36]);
         $localUpdate->addColumn('field_name', 'string', ['length' => 100]);
+        $localUpdate->addColumn('error', 'text', ['notnull' => false]);
+        $localUpdate->addColumn('errorTime', 'datetime', ['notnull' => false]);
         $localUpdate->setPrimaryKey(array('table_name', 'uid', 'field_name'));
 
         $localInsert = $schema->createTable('local_insert');
         $localInsert->addColumn('table_name', 'string', ['length' => 100]);
         $localInsert->addColumn('uid', 'string', ['length' => 36]);
+        $localInsert->addColumn('error', 'text', ['notnull' => false]);
+        $localInsert->addColumn('errorTime', 'datetime', ['notnull' => false]);
         $localInsert->setPrimaryKey(array('table_name', 'uid'));
 
         $localDelete = $schema->createTable('local_delete');
         $localDelete->addColumn('table_name', 'string', ['length' => 100]);
         $localDelete->addColumn('uid', 'string', ['length' => 36]);
-        $localDelete->addColumn('id', 'string', ['length' => 100,'notnull'=>false]);
+        $localDelete->addColumn('id', 'string', ['length' => 100, 'notnull' => false]);
+        $localDelete->addColumn('error', 'text', ['notnull' => false]);
+        $localDelete->addColumn('errorTime', 'datetime', ['notnull' => false]);
         $localDelete->setPrimaryKey(array('table_name', 'uid'));
         $localDelete->addUniqueIndex(['id', 'table_name']);
 
@@ -130,7 +136,7 @@ class LocalChangesTracker
             FOR EACH ROW
             BEGIN
               IF (NEW.id IS NULL AND NEW.createdTime IS NULL ) THEN
-                INSERT INTO local_insert VALUES (%s, NEW.uid);
+                INSERT INTO local_insert (table_name, uid) VALUES (%s, NEW.uid);
                 DELETE FROM local_delete WHERE table_name = %s AND uid = NEW.uid;
                 DELETE FROM local_update WHERE table_name = %s AND uid = NEW.uid;
               END IF;
@@ -157,7 +163,7 @@ class LocalChangesTracker
             FOR EACH ROW
             BEGIN
               IF (OLD.id IS NOT NULL) THEN
-                INSERT INTO local_delete VALUES (%s, OLD.uid, OLD.id);
+                INSERT INTO local_delete (table_name, uid, id) VALUES (%s, OLD.uid, OLD.id);
               END IF;
               DELETE FROM local_insert WHERE table_name = %s AND uid = OLD.uid;
               DELETE FROM local_update WHERE table_name = %s AND uid = OLD.uid;
@@ -186,7 +192,7 @@ class LocalChangesTracker
             $innerCode .= sprintf(
                 '
                 IF NOT(NEW.%s <=> OLD.%s) THEN
-                  REPLACE INTO local_update VALUES (%s, NEW.uid, %s);
+                  REPLACE INTO local_update (table_name, uid, field_name) VALUES (%s, NEW.uid, %s);
                 END IF;
             ', $columnName, $columnName, $tableNameQuoted, $this->connection->quote($column->getName())
             );
