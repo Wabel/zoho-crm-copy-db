@@ -328,11 +328,11 @@ class ZohoDatabaseCopier
             'sandbox' => ZOHO_CRM_SANDBOX
         ], 'Europe/Paris');
 
-        $oauthToken = $zohoClient->getZohoOAuthClient()->getAccessToken(ZOHO_CRM_CLIENT_CURRENT_USER_EMAIL);
-
         $client = new \GuzzleHttp\Client();
         $page = 1;
         while (true) {
+            $oauthToken = $zohoClient->getZohoOAuthClient()->getAccessToken(ZOHO_CRM_CLIENT_CURRENT_USER_EMAIL);
+            
             // Step 1: Create a bulk read job
             $this->logger->info('Creating read job for module ' . $apiModuleName . ' and page ' . $page . '...');
             $response = $client->request('POST', 'https://' . (ZOHO_CRM_SANDBOX === 'true' ? 'sandbox' : 'www') . '.zohoapis.com/crm/bulk/v2/read', [
