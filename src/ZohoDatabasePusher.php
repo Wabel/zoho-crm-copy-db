@@ -152,7 +152,7 @@ class ZohoDatabasePusher
 
                         foreach ($fieldsUpdatedResults as $fieldResults) {
                             $columnName = $fieldResults['field_name'];
-                            if (isset($record[$columnName])) {
+                            if (array_key_exists($columnName, $record)) {
                                 $this->updateDataZohoBean($zohoDao, $zohoBean, $columnName, $record[$columnName]);
                             } else {
                                 $errorMessage = sprintf('Impossible to find the column %s for row with uid %s in the table %s', $columnName, $result['uid'], $tableName);
