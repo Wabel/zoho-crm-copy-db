@@ -148,159 +148,177 @@ class ZohoDatabaseCopier
         $totalRecords = 0;
         $totalRecordsDeleted = 0;
 
-        try {
-            if ($incrementalSync) {
-                // Let's get the last modification date:
-                $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
-                $lastActivityTime = null;
-                if ($modifiedSince) {
-                    $lastActivityTime = new \DateTime($modifiedSince);
-                } else {
-                    if ($tableDetail->hasColumn('modifiedTime')) {
-                        $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
+        $recordsPage = 1;
+        $stopAndhasMoreResults = true;
+        $recordsPaginationLastTime = null;
+        while ($stopAndhasMoreResults) {
+            try {
+                if ($incrementalSync) {
+                    if ($recordsPage === 1) {
+                        // Let's get the last modification date:
+                        $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
+                        $lastActivityTime = null;
+                        if ($modifiedSince) {
+                            $lastActivityTime = new \DateTime($modifiedSince);
+                        } else {
+                            if ($tableDetail->hasColumn('modifiedTime')) {
+                                $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
+                            }
+                            if (!$lastActivityTime && $tableDetail->hasColumn('createdTime')) {
+                                $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
+                            }
+
+                            if ($lastActivityTime !== null) {
+                                $lastActivityTime = new \DateTime($lastActivityTime, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
+                                // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
+                                $lastActivityTime->add(new \DateInterval('PT1S'));
+                            }
+                        }
+
+                        if ($lastActivityTime) {
+                            $this->logger->info(sprintf('Incremental copy from %s started for module %s', $lastActivityTime->format(\DateTime::ATOM), $dao->getPluralModuleName()));
+                        } else {
+                            $this->logger->info(sprintf('Incremental copy started for module %s', $dao->getPluralModuleName()));
+                        }
+                    } else {
+                        $lastActivityTime = $recordsPaginationLastTime;
                     }
-                    if (!$lastActivityTime && $tableDetail->hasColumn('createdTime')) {
-                        $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
+
+                    $this->logger->notice(sprintf('Fetching the records to insert/update for module %s...', $dao->getPluralModuleName()));
+                    $records = $dao->getRecords(null, null, null, $lastActivityTime, $recordsPage, 200, $stopAndhasMoreResults);
+                    if ($stopAndhasMoreResults) {
+                        $recordsPaginationLastTime = $lastActivityTime;
+                        $recordsPage++;
                     }
+                    $totalRecords = count($records);
+                    $this->logger->debug($totalRecords . ' records fetched.');
+                    $deletedRecords = [];
+                    $totalRecordsDeleted = 0;
+                    if (($recordsPage - 1) === 1) {
+                        $this->logger->notice(sprintf('Fetching the records to delete for module %s...', $dao->getPluralModuleName()));
+                        $deletedRecords = $dao->getDeletedRecordIds($lastActivityTime);
+                        $totalRecordsDeleted = count($deletedRecords);
+                        $this->logger->debug($totalRecordsDeleted . ' records fetched.');
+                    }
+                } else {
+                    $this->logger->info(sprintf('Full copy started for module %s', $dao->getPluralModuleName()));
+                    $this->logger->notice(sprintf('Fetching the records to insert/update for module ...%s', $dao->getPluralModuleName()));
+                    $records = $dao->getRecords();
+                    $totalRecords = count($records);
+                    $this->logger->debug($totalRecords . ' records fetched.');
+                    $deletedRecords = [];
+                    $stopAndhasMoreResults = false;
+                }
+            } catch (ZCRMException $exception) {
+                $this->logger->error('Error when getting records for module ' . $dao->getPluralModuleName() . ': ' . $exception->getMessage(), [
+                    'exception' => $exception
+                ]);
+                if ($throwErrors) {
+                    throw $exception;
+                }
+                return;
+            }
+            $this->logger->info(sprintf('Inserting/updating %s records into table %s...', $totalRecords, $tableName));
 
-                    if ($lastActivityTime !== null) {
-                        $lastActivityTime = new \DateTime($lastActivityTime, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
-                        // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
-                        $lastActivityTime->add(new \DateInterval('PT1S'));
+            $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
+
+            $select = $this->connection->prepare('SELECT * FROM ' . $tableName . ' WHERE id = :id');
+
+            $this->connection->beginTransaction();
+
+            $recordsModificationCounts = [
+                'insert' => 0,
+                'update' => 0,
+                'delete' => 0,
+            ];
+
+            $logOffset = $totalRecords >= 500 ? 100 : 50;
+            $processedRecords = 0;
+            foreach ($records as $record) {
+                if (($processedRecords % $logOffset) === 0) {
+                    $this->logger->info(sprintf('%d/%s records processed for module %s', $processedRecords, $totalRecords, $dao->getPluralModuleName()));
+                }
+                ++$processedRecords;
+                $data = [];
+                $types = [];
+                foreach ($table->getColumns() as $column) {
+                    if (in_array($column->getName(), ['id', 'uid'])) {
+                        continue;
+                    }
+                    $field = $dao->getFieldFromFieldName($column->getName());
+                    if (!$field) {
+                        continue;
+                    }
+                    $getterName = $field->getGetter();
+                    $dataValue = $record->$getterName();
+                    $finalFieldData = null;
+                    if ($dataValue instanceof ZCRMRecord) {
+                        $finalFieldData = $dataValue->getEntityId();
+                    } elseif (is_array($dataValue)) {
+                        $finalFieldData = implode(';', $dataValue);
+                    } else {
+                        $finalFieldData = $dataValue;
+                    }
+                    $data[$column->getName()] = $finalFieldData;
+                    $types[$column->getName()] = $column->getType()->getName();
+                }
+
+                $select->execute(['id' => $record->getZohoId()]);
+                $result = $select->fetch(\PDO::FETCH_ASSOC);
+                if ($result === false) {
+                    $this->logger->debug(sprintf('Inserting record with ID \'%s\' in table %s...', $record->getZohoId(), $tableName));
+
+                    $data['id'] = $record->getZohoId();
+                    $types['id'] = 'string';
+
+                    $recordsModificationCounts['insert'] += $this->connection->insert($tableName, $data, $types);
+
+                    foreach ($this->listeners as $listener) {
+                        $listener->onInsert($data, $dao);
+                    }
+                } else {
+                    $this->logger->debug(sprintf('Updating record with ID \'%s\' in table %s...', $record->getZohoId(), $tableName));
+                    $identifier = ['id' => $record->getZohoId()];
+                    $types['id'] = 'string';
+
+                    $recordsModificationCounts['update'] += $this->connection->update($tableName, $data, $identifier, $types);
+
+                    // Let's add the id for the update trigger
+                    $data['id'] = $record->getZohoId();
+                    foreach ($this->listeners as $listener) {
+                        $listener->onUpdate($data, $result, $dao);
                     }
                 }
+            }
 
-                if ($lastActivityTime) {
-                    $this->logger->info(sprintf('Incremental copy from %s started for module %s', $lastActivityTime->format(\DateTime::ATOM), $dao->getPluralModuleName()));
-                } else {
-                    $this->logger->info(sprintf('Incremental copy started for module %s', $dao->getPluralModuleName()));
+            $this->logger->info(sprintf('Deleting %d records from table %s...', $totalRecordsDeleted, $tableName));
+            $sqlStatementUid = 'select uid from ' . $this->connection->quoteIdentifier($tableName) . ' where id = :id';
+            $processedRecords = 0;
+            $logOffset = $totalRecordsDeleted >= 500 ? 100 : 50;
+            foreach ($deletedRecords as $deletedRecord) {
+                if (($processedRecords % $logOffset) === 0) {
+                    $this->logger->info(sprintf('%d/%d records processed for module %s', $processedRecords, $totalRecordsDeleted, $dao->getPluralModuleName()));
                 }
+                ++$processedRecords;
+                $this->logger->debug(sprintf('Deleting record with ID \'%s\' in table %s...', $deletedRecord->getEntityId(), $tableName));
+                $uid = $this->connection->fetchColumn($sqlStatementUid, ['id' => $deletedRecord->getEntityId()]);
+                $recordsModificationCounts['delete'] += $this->connection->delete($tableName, ['id' => $deletedRecord->getEntityId()]);
+                if ($twoWaysSync) {
+                    // TODO: we could detect if there are changes to be updated to the server and try to warn with a log message
+                    // Also, let's remove the newly created field (because of the trigger) to avoid looping back to Zoho
+                    $this->connection->delete('local_delete', ['table_name' => $tableName, 'id' => $deletedRecord->getEntityId()]);
+                    $this->connection->delete('local_update', ['table_name' => $tableName, 'uid' => $uid]);
+                }
+            }
 
-                $this->logger->notice(sprintf('Fetching the records to insert/update for module %s...', $dao->getPluralModuleName()));
-                $records = $dao->getRecords(null, null, null, $lastActivityTime);
-                $totalRecords = count($records);
-                $this->logger->debug($totalRecords . ' records fetched.');
-                $this->logger->notice(sprintf('Fetching the records to delete for module %s...', $dao->getPluralModuleName()));
-                $deletedRecords = $dao->getDeletedRecordIds($lastActivityTime);
-                $totalRecordsDeleted = count($deletedRecords);
-                $this->logger->debug($totalRecordsDeleted . ' records fetched.');
-            } else {
-                $this->logger->info(sprintf('Full copy started for module %s', $dao->getPluralModuleName()));
-                $this->logger->notice(sprintf('Fetching the records to insert/update for module ...%s', $dao->getPluralModuleName()));
-                $records = $dao->getRecords();
-                $totalRecords = count($records);
-                $this->logger->debug($totalRecords . ' records fetched.');
-                $deletedRecords = [];
-            }
-        } catch (ZCRMException $exception) {
-            $this->logger->error('Error when getting records for module ' . $dao->getPluralModuleName() . ': ' . $exception->getMessage(), [
-                'exception' => $exception
-            ]);
-            if ($throwErrors) {
-                throw $exception;
-            }
-            return;
+            $this->logger->notice(sprintf('Copy finished with %d item(s) inserted, %d item(s) updated and %d item(s) deleted.',
+                $recordsModificationCounts['insert'],
+                $recordsModificationCounts['update'],
+                $recordsModificationCounts['delete']
+            ));
+
+            $this->connection->commit();
         }
-        $this->logger->info(sprintf('Inserting/updating %s records into table %s...', $totalRecords, $tableName));
-
-        $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
-
-        $select = $this->connection->prepare('SELECT * FROM ' . $tableName . ' WHERE id = :id');
-
-        $this->connection->beginTransaction();
-
-        $recordsModificationCounts = [
-            'insert' => 0,
-            'update' => 0,
-            'delete' => 0,
-        ];
-
-        $logOffset = $totalRecords >= 500 ? 100 : 50;
-        $processedRecords = 0;
-        foreach ($records as $record) {
-            if (($processedRecords % $logOffset) === 0) {
-                $this->logger->info(sprintf('%d/%s records processed for module %s', $processedRecords, $totalRecords, $dao->getPluralModuleName()));
-            }
-            ++$processedRecords;
-            $data = [];
-            $types = [];
-            foreach ($table->getColumns() as $column) {
-                if (in_array($column->getName(), ['id', 'uid'])) {
-                    continue;
-                }
-                $field = $dao->getFieldFromFieldName($column->getName());
-                if (!$field) {
-                    continue;
-                }
-                $getterName = $field->getGetter();
-                $dataValue = $record->$getterName();
-                $finalFieldData = null;
-                if ($dataValue instanceof ZCRMRecord) {
-                    $finalFieldData = $dataValue->getEntityId();
-                } elseif (is_array($dataValue)) {
-                    $finalFieldData = implode(';', $dataValue);
-                } else {
-                    $finalFieldData = $dataValue;
-                }
-                $data[$column->getName()] = $finalFieldData;
-                $types[$column->getName()] = $column->getType()->getName();
-            }
-
-            $select->execute(['id' => $record->getZohoId()]);
-            $result = $select->fetch(\PDO::FETCH_ASSOC);
-            if ($result === false) {
-                $this->logger->debug(sprintf('Inserting record with ID \'%s\' in table %s...', $record->getZohoId(), $tableName));
-
-                $data['id'] = $record->getZohoId();
-                $types['id'] = 'string';
-
-                $recordsModificationCounts['insert'] += $this->connection->insert($tableName, $data, $types);
-
-                foreach ($this->listeners as $listener) {
-                    $listener->onInsert($data, $dao);
-                }
-            } else {
-                $this->logger->debug(sprintf('Updating record with ID \'%s\' in table %s...', $record->getZohoId(), $tableName));
-                $identifier = ['id' => $record->getZohoId()];
-                $types['id'] = 'string';
-
-                $recordsModificationCounts['update'] += $this->connection->update($tableName, $data, $identifier, $types);
-
-                // Let's add the id for the update trigger
-                $data['id'] = $record->getZohoId();
-                foreach ($this->listeners as $listener) {
-                    $listener->onUpdate($data, $result, $dao);
-                }
-            }
-        }
-
-        $this->logger->info(sprintf('Deleting %d records from table %s...', $totalRecordsDeleted, $tableName));
-        $sqlStatementUid = 'select uid from ' . $this->connection->quoteIdentifier($tableName) . ' where id = :id';
-        $processedRecords = 0;
-        $logOffset = $totalRecordsDeleted >= 500 ? 100 : 50;
-        foreach ($deletedRecords as $deletedRecord) {
-            if (($processedRecords % $logOffset) === 0) {
-                $this->logger->info(sprintf('%d/%d records processed for module %s', $processedRecords, $totalRecordsDeleted, $dao->getPluralModuleName()));
-            }
-            ++$processedRecords;
-            $this->logger->debug(sprintf('Deleting record with ID \'%s\' in table %s...', $deletedRecord->getEntityId(), $tableName));
-            $uid = $this->connection->fetchColumn($sqlStatementUid, ['id' => $deletedRecord->getEntityId()]);
-            $recordsModificationCounts['delete'] += $this->connection->delete($tableName, ['id' => $deletedRecord->getEntityId()]);
-            if ($twoWaysSync) {
-                // TODO: we could detect if there are changes to be updated to the server and try to warn with a log message
-                // Also, let's remove the newly created field (because of the trigger) to avoid looping back to Zoho
-                $this->connection->delete('local_delete', ['table_name' => $tableName, 'id' => $deletedRecord->getEntityId()]);
-                $this->connection->delete('local_update', ['table_name' => $tableName, 'uid' => $uid]);
-            }
-        }
-
-        $this->logger->notice(sprintf('Copy finished with %d item(s) inserted, %d item(s) updated and %d item(s) deleted.',
-            $recordsModificationCounts['insert'],
-            $recordsModificationCounts['update'],
-            $recordsModificationCounts['delete']
-        ));
-
-        $this->connection->commit();
     }
 
     public function fetchFromZohoInBulk(AbstractZohoDao $dao)
@@ -332,7 +350,7 @@ class ZohoDatabaseCopier
         $page = 1;
         while (true) {
             $oauthToken = $zohoClient->getZohoOAuthClient()->getAccessToken(ZOHO_CRM_CLIENT_CURRENT_USER_EMAIL);
-            
+
             // Step 1: Create a bulk read job
             $this->logger->info('Creating read job for module ' . $apiModuleName . ' and page ' . $page . '...');
             $response = $client->request('POST', 'https://' . (ZOHO_CRM_SANDBOX === 'true' ? 'sandbox' : 'www') . '.zohoapis.com/crm/bulk/v2/read', [
