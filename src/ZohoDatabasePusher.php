@@ -287,6 +287,10 @@ class ZohoDatabasePusher
             $responseKey++;
         }
     }
+    
+    private function endsWith($haystack, $needle) {
+        return substr_compare($haystack, $needle, -strlen($needle)) === 0;
+    }
 
     /**
      * Insert data to bean in order to insert zoho records.
@@ -302,6 +306,10 @@ class ZohoDatabasePusher
             if (!in_array($columnName, EntitiesGeneratorService::$defaultDateFields) && $fieldMethod
                 && (!in_array($columnName, ['id', 'uid'])) && !is_null($columnValue)
             ) {
+                // Changing only Name doesn't work properly on Zoho
+                if ($this->endsWith($columnName, '_OwnerName') || $this->endsWith($columnName, '_Name')) {
+                    continue;
+                }
                 $type = $fieldMethod->getType();
                 $value = $this->formatValueToBeans($type, $columnValue);
                 $setterMethod = $fieldMethod->getSetter();
@@ -324,6 +332,10 @@ class ZohoDatabasePusher
         if (!in_array($columnName, EntitiesGeneratorService::$defaultDateFields) && $fieldMethod
             && !in_array($columnName, ['id', 'uid'])
         ) {
+            // Changing only Name doesn't work properly on Zoho
+            if ($this->endsWith($columnName, '_OwnerName') || $this->endsWith($columnName, '_Name')) {
+                return;
+            }
             $type = $fieldMethod->getType();
             $value = is_null($valueDb) ? $valueDb : $this->formatValueToBeans($type, $valueDb);
             $setterMethod = $fieldMethod->getSetter();
