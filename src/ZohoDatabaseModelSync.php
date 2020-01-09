@@ -174,6 +174,7 @@ class ZohoDatabaseModelSync
                 case 'ALARM':
                 case 'RRULE':
                 case 'event_reminder':
+                case 'multireminder':
                     continue 2;
                     break;
                 default:
