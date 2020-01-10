@@ -367,7 +367,7 @@ class ZohoDatabasePusher
                 $value = (int)$value;
                 break;
             case 'double' :
-                $value = number_format($value, 2);
+                $value = (float)$value;
                 break;
             case 'multiselectlookup':
             case 'multiuserlookup':
