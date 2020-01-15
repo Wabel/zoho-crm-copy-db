@@ -209,9 +209,11 @@ class ZohoDatabaseModelSync
         $hasChanges = $dbalTableDiffService->createOrUpdateTable($table);
         if ($recreateTriggers) {
             $this->localChangesTracker->createUuidInsertTrigger($table);
-            $this->localChangesTracker->createInsertTrigger($table);
-            $this->localChangesTracker->createDeleteTrigger($table);
-            $this->localChangesTracker->createUpdateTrigger($table);
+            if ($twoWaysSync) {
+                $this->localChangesTracker->createInsertTrigger($table);
+                $this->localChangesTracker->createDeleteTrigger($table);
+                $this->localChangesTracker->createUpdateTrigger($table);
+            }
         } else if (!$skipCreateTrigger) {
             $hasUuidTrigger = $this->localChangesTracker->hasTriggerInsertUuid($table);
             if (!$hasUuidTrigger || $hasChanges) {
