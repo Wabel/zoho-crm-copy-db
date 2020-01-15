@@ -122,6 +122,12 @@ $databaseCopier = new ZohoDatabaseCopier($connection, "my_prefix_", [ $listener 
 Versions
 --------
 
+### 3.2.2
+
+Fix a bug by changing the way triggers are created after a table structure has been updated.
+
+Create an option `recreate-triggers` that will force the creation of the triggers for all tables. 
+
 ### 3.2
 
 **Bulk**

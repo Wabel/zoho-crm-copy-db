@@ -125,7 +125,8 @@ class ZohoSyncDatabaseCommand extends Command
             ->addOption('dump-logs', null, InputOption::VALUE_NONE, 'Dump logs into console when command finishes')
             ->addOption('continue-on-error', null, InputOption::VALUE_NONE, 'Don\'t stop the command on errors')
             ->addOption('fetch-bulk', null, InputOption::VALUE_NONE, 'Fetch the data module by module using bulk read API')
-            ->addOption('modified-since', null, InputOption::VALUE_OPTIONAL, 'Fetch the data since a particular date (ISO 8601)');
+            ->addOption('modified-since', null, InputOption::VALUE_OPTIONAL, 'Fetch the data since a particular date (ISO 8601)')
+            ->addOption('recreate-triggers', null, InputOption::VALUE_NONE, 'Force the recreation of the triggers');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -215,10 +216,11 @@ class ZohoSyncDatabaseCommand extends Command
     {
         $twoWaysSync = !$input->getOption('fetch-only');
         $skipCreateTrigger = $input->getOption('skip-trigger');
+        $recreateTriggers = $input->getOption('recreate-triggers');
 
         $this->logger->notice('Starting to synchronize Zoho DB model with the local database...');
         foreach ($this->zohoDaos as $zohoDao) {
-            $this->zohoDatabaseModelSync->synchronizeDbModel($zohoDao, $twoWaysSync, $skipCreateTrigger);
+            $this->zohoDatabaseModelSync->synchronizeDbModel($zohoDao, $twoWaysSync, $skipCreateTrigger, $recreateTriggers);
         }
         $this->logger->notice('Zoho DB model successfully synchronized.');
     }

@@ -74,11 +74,12 @@ class ZohoDatabaseModelSync
      * @param AbstractZohoDao $dao
      * @param bool $twoWaysSync
      * @param bool $skipCreateTrigger
+     * @param bool $recreateTriggers
      *
      * @throws \Doctrine\DBAL\DBALException
      * @throws \Doctrine\DBAL\Schema\SchemaException
      */
-    public function synchronizeDbModel(AbstractZohoDao $dao, $twoWaysSync, $skipCreateTrigger = false)
+    public function synchronizeDbModel(AbstractZohoDao $dao, $twoWaysSync, $skipCreateTrigger = false, $recreateTriggers = false)
     {
         if ($twoWaysSync === true && !$this->trackingTablesDone) {
             $this->localChangesTracker->createTrackingTables();
@@ -206,13 +207,18 @@ class ZohoDatabaseModelSync
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
         $hasChanges = $dbalTableDiffService->createOrUpdateTable($table);
-        if ($hasChanges || !$skipCreateTrigger) {
+        if ($recreateTriggers) {
+            $this->localChangesTracker->createUuidInsertTrigger($table);
+            $this->localChangesTracker->createInsertTrigger($table);
+            $this->localChangesTracker->createDeleteTrigger($table);
+            $this->localChangesTracker->createUpdateTrigger($table);
+        } else if (!$skipCreateTrigger) {
             $hasUuidTrigger = $this->localChangesTracker->hasTriggerInsertUuid($table);
-            if (!$hasUuidTrigger) {
+            if (!$hasUuidTrigger || $hasChanges) {
                 $this->localChangesTracker->createUuidInsertTrigger($table);
             }
             $hasAllTriggers = $this->localChangesTracker->hasTriggersInsertUpdateDelete($table);
-            if ($twoWaysSync && !$hasAllTriggers) {
+            if ($twoWaysSync && (!$hasAllTriggers || $hasChanges)) {
                 $this->localChangesTracker->createInsertTrigger($table);
                 $this->localChangesTracker->createDeleteTrigger($table);
                 $this->localChangesTracker->createUpdateTrigger($table);
