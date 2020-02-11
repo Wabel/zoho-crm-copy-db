@@ -122,6 +122,26 @@ $databaseCopier = new ZohoDatabaseCopier($connection, "my_prefix_", [ $listener 
 Versions
 --------
 
+### 3.2.3
+
+This version allow to use a configuration table to store multiple config data.  
+The table looks like:
+
+```sql
+CREATE TABLE `zoho_sync_config` ( `config_key` VARCHAR(100) NOT NULL , `table_name` VARCHAR(200) NULL DEFAULT NULL , `config_value` VARCHAR(200) NOT NULL ) ENGINE = InnoDB;
+```
+
+The first usage of this table, implemented in this version allow to see/override the date that is sent to zoho when fetching records.
+
+This table is optional and the script should work as usual if you don't have it.
+
+The first two `config_key` are:
+* `FETCH_RECORDS_MODIFIED_SINCE__DATE`: Date-modified-since, that is used when fetching data
+* `FETCH_RECORDS_MODIFIED_SINCE__PAGE`: The page (offset) of the records
+
+The script has been updated to use this new configuration. That is helpful in case of unhandled error to continue on the same page and same date as the last synchronization failed.  
+And you are also free to update the value in database, to manually enter the date from when you want your data.
+
 ### 3.2.2
 
 Fix a bug by changing the way triggers are created after a table structure has been updated.

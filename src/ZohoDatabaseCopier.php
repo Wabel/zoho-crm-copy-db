@@ -145,33 +145,66 @@ class ZohoDatabaseCopier
     {
         $tableName = ZohoDatabaseHelper::getTableName($dao, $this->prefix);
 
+        $zohoSyncConfigTableExists = $this->connection->getSchemaManager()->tablesExist(['zoho_sync_config']);
+
+        $currentDateTime = new \DateTime();
+
         $totalRecords = 0;
         $totalRecordsDeleted = 0;
 
         $recordsPage = 1;
         $stopAndhasMoreResults = true;
         $recordsPaginationLastTime = null;
+
         while ($stopAndhasMoreResults) {
             try {
                 if ($incrementalSync) {
                     if ($recordsPage === 1) {
                         // Let's get the last modification date:
                         $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
+                        /** @var \DateTime|null $lastActivityTime */
                         $lastActivityTime = null;
-                        if ($modifiedSince) {
-                            $lastActivityTime = new \DateTime($modifiedSince);
-                        } else {
-                            if ($tableDetail->hasColumn('modifiedTime')) {
-                                $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
-                            }
-                            if (!$lastActivityTime && $tableDetail->hasColumn('createdTime')) {
-                                $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
-                            }
 
-                            if ($lastActivityTime !== null) {
-                                $lastActivityTime = new \DateTime($lastActivityTime, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
-                                // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
-                                $lastActivityTime->add(new \DateInterval('PT1S'));
+                        $findDateByModifiedTime = false;
+
+                        if ($zohoSyncConfigTableExists && $modifiedSince === null) {
+                            $lastDateInConfig = $this->connection->fetchColumn('SELECT config_value FROM zoho_sync_config WHERE config_key = ? AND table_name = ?', [
+                                'FETCH_RECORDS_MODIFIED_SINCE__DATE',
+                                $tableName
+                            ]);
+                            if ($lastDateInConfig !== false) {
+                                $lastPageInConfig = $this->connection->fetchColumn('SELECT config_value FROM zoho_sync_config WHERE config_key = ? AND table_name = ?', [
+                                    'FETCH_RECORDS_MODIFIED_SINCE__PAGE',
+                                    $tableName
+                                ]);
+                                if ($lastPageInConfig === false) {
+                                    $lastPageInConfig = '1';
+                                }
+                                $lastActivityTime = new \DateTime($lastDateInConfig);
+                                $recordsPage = (int)$lastPageInConfig;
+                            } else {
+                                $findDateByModifiedTime = true;
+                            }
+                        } else {
+                            $findDateByModifiedTime = true;
+                        }
+
+                        if ($findDateByModifiedTime) {
+                            if ($modifiedSince) {
+                                $lastActivityTime = new \DateTime($modifiedSince);
+                            } else {
+                                if ($tableDetail->hasColumn('modifiedTime')) {
+                                    $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
+                                }
+                                if (!$lastActivityTime && $tableDetail->hasColumn('createdTime')) {
+                                    $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
+                                }
+
+                                if ($lastActivityTime !== null) {
+                                    $lastActivityTime = new \DateTime($lastActivityTime, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
+                                    // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
+                                    $lastActivityTime->add(new \DateInterval('PT1S'));
+                                }
                             }
                         }
 
@@ -187,8 +220,31 @@ class ZohoDatabaseCopier
                     $this->logger->notice(sprintf('Fetching the records to insert/update for module %s...', $dao->getPluralModuleName()));
                     $records = $dao->getRecords(null, null, null, $lastActivityTime, $recordsPage, 200, $stopAndhasMoreResults);
                     if ($stopAndhasMoreResults) {
+
+                        if ($zohoSyncConfigTableExists) {
+                            $lastDate = $lastActivityTime ? $lastActivityTime->format('Y-m-d H:i:s') : date('Y-m-d H:i:s', 0);
+                            $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__DATE', $tableName, $lastDate);
+                            $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__PAGE', $tableName, (string)$recordsPage);
+                        }
+
                         $recordsPaginationLastTime = $lastActivityTime;
                         $recordsPage++;
+                    } else {
+                        if ($zohoSyncConfigTableExists) {
+                            $latestDateToSave = $currentDateTime->format('Y-m-d H:i:s');
+                            $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
+                            if ($tableDetail->hasColumn('modifiedTime')) {
+                                $latestDateToSave = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
+                            }
+                            if (!$latestDateToSave && $tableDetail->hasColumn('createdTime')) {
+                                $latestDateToSave = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
+                            }
+                            if (!$latestDateToSave) {
+                                $latestDateToSave = $currentDateTime->format('Y-m-d H:i:s');
+                            }
+                            $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__DATE', $tableName, $latestDateToSave);
+                            $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__PAGE', $tableName, '1');
+                        }
                     }
                     $totalRecords = count($records);
                     $this->logger->debug($totalRecords . ' records fetched.');
@@ -316,6 +372,14 @@ class ZohoDatabaseCopier
                 $recordsModificationCounts['update'],
                 $recordsModificationCounts['delete']
             ));
+
+            if ($recordsModificationCounts['insert'] === 0 && $recordsModificationCounts['update'] === 0 && $recordsModificationCounts['delete'] === 0) {
+                $stopAndhasMoreResults = false;
+                if ($zohoSyncConfigTableExists) {
+                    $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__DATE', $tableName, $currentDateTime->format('Y-m-d H:i:s'));
+                    $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__PAGE', $tableName, '1');
+                }
+            }
 
             $this->connection->commit();
         }
@@ -548,6 +612,28 @@ class ZohoDatabaseCopier
             }
             $this->logger->info('More records to fetch for the module ' . $apiModuleName);
             ++$page;
+        }
+    }
+
+    private function upsertZohoConfig(string $configKey, string $tableName, string $configValue)
+    {
+        $configExists = $this->connection->fetchColumn('SELECT config_value FROM zoho_sync_config WHERE config_key = ? AND table_name = ?', [
+            $configKey,
+            $tableName
+        ]);
+        if ($configExists === false) {
+            $this->connection->insert('zoho_sync_config', [
+                'config_key' => $configKey,
+                'table_name' => $tableName,
+                'config_value' => $configValue
+            ]);
+        } else {
+            $this->connection->update('zoho_sync_config', [
+                'config_value' => $configValue
+            ], [
+                'config_key' => $configKey,
+                'table_name' => $tableName,
+            ]);
         }
     }
 }
