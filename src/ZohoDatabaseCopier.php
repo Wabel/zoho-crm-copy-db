@@ -373,15 +373,26 @@ class ZohoDatabaseCopier
                 $recordsModificationCounts['delete']
             ));
 
-            if ($recordsModificationCounts['insert'] === 0 && $recordsModificationCounts['update'] === 0 && $recordsModificationCounts['delete'] === 0) {
+            $this->connection->commit();
+
+            if (($recordsModificationCounts['insert'] === 0 && $recordsModificationCounts['update'] === 0 && $recordsModificationCounts['delete'] === 0) || $stopAndhasMoreResults === false) {
                 $stopAndhasMoreResults = false;
                 if ($zohoSyncConfigTableExists) {
-                    $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__DATE', $tableName, $currentDateTime->format('Y-m-d H:i:s'));
+                    $latestDateToSave = $currentDateTime->format('Y-m-d H:i:s');
+                    $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
+                    if ($tableDetail->hasColumn('modifiedTime')) {
+                        $latestDateToSave = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
+                    }
+                    if (!$latestDateToSave && $tableDetail->hasColumn('createdTime')) {
+                        $latestDateToSave = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
+                    }
+                    if (!$latestDateToSave) {
+                        $latestDateToSave = $currentDateTime->format('Y-m-d H:i:s');
+                    }
+                    $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__DATE', $tableName, $latestDateToSave);
                     $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__PAGE', $tableName, '1');
                 }
             }
-
-            $this->connection->commit();
         }
     }
 
