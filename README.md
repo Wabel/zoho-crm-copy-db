@@ -124,6 +124,14 @@ Versions
 
 ### 3.2.3
 
+_18 Feb. 2020_
+
+Timezone is now used when getting the records with "If-Modified-Since" and using the `zoho_sync_config` table.
+
+Records are now fetched using the sort and order columns (by priority: Modified_Time, Created_Time).
+
+_11 Feb. 2020_
+
 This version allow to use a configuration table to store multiple config data.  
 The table looks like:
 

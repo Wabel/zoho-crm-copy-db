@@ -144,6 +144,9 @@ class ZohoDatabaseCopier
     public function fetchFromZoho(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true, $throwErrors = true, $modifiedSince = null)
     {
         $tableName = ZohoDatabaseHelper::getTableName($dao, $this->prefix);
+        $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
+        $tableHasColumnModifiedTime = $tableDetail->hasColumn('modifiedTime');
+        $tableHasColumnCreatedTime = $tableDetail->hasColumn('createdTime');
 
         $zohoSyncConfigTableExists = $this->connection->getSchemaManager()->tablesExist(['zoho_sync_config']);
 
@@ -161,7 +164,6 @@ class ZohoDatabaseCopier
                 if ($incrementalSync) {
                     if ($recordsPage === 1) {
                         // Let's get the last modification date:
-                        $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
                         /** @var \DateTime|null $lastActivityTime */
                         $lastActivityTime = null;
 
@@ -180,7 +182,7 @@ class ZohoDatabaseCopier
                                 if ($lastPageInConfig === false) {
                                     $lastPageInConfig = '1';
                                 }
-                                $lastActivityTime = new \DateTime($lastDateInConfig);
+                                $lastActivityTime = new \DateTime($lastDateInConfig, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
                                 $recordsPage = (int)$lastPageInConfig;
                             } else {
                                 $findDateByModifiedTime = true;
@@ -193,10 +195,10 @@ class ZohoDatabaseCopier
                             if ($modifiedSince) {
                                 $lastActivityTime = new \DateTime($modifiedSince);
                             } else {
-                                if ($tableDetail->hasColumn('modifiedTime')) {
+                                if ($tableHasColumnModifiedTime) {
                                     $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
                                 }
-                                if (!$lastActivityTime && $tableDetail->hasColumn('createdTime')) {
+                                if (!$lastActivityTime && $tableHasColumnCreatedTime) {
                                     $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
                                 }
 
@@ -218,7 +220,19 @@ class ZohoDatabaseCopier
                     }
 
                     $this->logger->notice(sprintf('Fetching the records to insert/update for module %s...', $dao->getPluralModuleName()));
-                    $records = $dao->getRecords(null, null, null, $lastActivityTime, $recordsPage, 200, $stopAndhasMoreResults);
+
+                    $sortColumn = null;
+                    $sortOrder = null;
+
+                    if ($tableHasColumnModifiedTime) {
+                        $sortColumn = 'Modified_Time';
+                        $sortOrder = 'asc';
+                    } else if ($tableHasColumnCreatedTime) {
+                        $sortColumn = 'Created_Time';
+                        $sortOrder = 'asc';
+                    }
+
+                    $records = $dao->getRecords(null, $sortColumn, $sortOrder, $lastActivityTime, $recordsPage, 200, $stopAndhasMoreResults);
                     if ($stopAndhasMoreResults) {
 
                         if ($zohoSyncConfigTableExists) {
@@ -232,11 +246,10 @@ class ZohoDatabaseCopier
                     } else {
                         if ($zohoSyncConfigTableExists) {
                             $latestDateToSave = $currentDateTime->format('Y-m-d H:i:s');
-                            $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
-                            if ($tableDetail->hasColumn('modifiedTime')) {
+                            if ($tableHasColumnModifiedTime) {
                                 $latestDateToSave = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
                             }
-                            if (!$latestDateToSave && $tableDetail->hasColumn('createdTime')) {
+                            if (!$latestDateToSave && $tableHasColumnCreatedTime) {
                                 $latestDateToSave = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
                             }
                             if (!$latestDateToSave) {
@@ -379,11 +392,10 @@ class ZohoDatabaseCopier
                 $stopAndhasMoreResults = false;
                 if ($zohoSyncConfigTableExists) {
                     $latestDateToSave = $currentDateTime->format('Y-m-d H:i:s');
-                    $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
-                    if ($tableDetail->hasColumn('modifiedTime')) {
+                    if ($tableHasColumnModifiedTime) {
                         $latestDateToSave = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
                     }
-                    if (!$latestDateToSave && $tableDetail->hasColumn('createdTime')) {
+                    if (!$latestDateToSave && $tableHasColumnCreatedTime) {
                         $latestDateToSave = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
                     }
                     if (!$latestDateToSave) {
