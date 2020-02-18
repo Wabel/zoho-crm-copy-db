@@ -130,6 +130,12 @@ Timezone is now used when getting the records with "If-Modified-Since" and using
 
 Records are now fetched using the sort and order columns (by priority: Modified_Time, Created_Time).
 
+Improve processing time when fetching data by adding some cache.  
+> When fetching data from Zoho, the script was checking for each record in the database if the column exists.  
+> Then it would check if the DAO contains the correct setter linked for the column.  
+> We added some cache on the columns and the setters fields to avoid checking the information for each records.  
+> In local, processing 200 records went from ~26sec to ~1sec with this change :)
+
 _11 Feb. 2020_
 
 This version allow to use a configuration table to store multiple config data.  

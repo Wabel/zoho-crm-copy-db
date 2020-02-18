@@ -148,6 +148,16 @@ class ZohoDatabaseCopier
         $tableHasColumnModifiedTime = $tableDetail->hasColumn('modifiedTime');
         $tableHasColumnCreatedTime = $tableDetail->hasColumn('createdTime');
 
+        $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
+
+        // To speed up process we cache the table columns/type here
+        $tableColumns = [];
+        foreach ($table->getColumns() as $column) {
+            $tableColumns[$column->getName()] = $column->getType()->getName();
+        }
+
+        $cachedFieldForColumnName = [];
+
         $zohoSyncConfigTableExists = $this->connection->getSchemaManager()->tablesExist(['zoho_sync_config']);
 
         $currentDateTime = new \DateTime();
@@ -289,8 +299,6 @@ class ZohoDatabaseCopier
             }
             $this->logger->info(sprintf('Inserting/updating %s records into table %s...', $totalRecords, $tableName));
 
-            $table = $this->connection->getSchemaManager()->createSchema()->getTable($tableName);
-
             $select = $this->connection->prepare('SELECT * FROM ' . $tableName . ' WHERE id = :id');
 
             $this->connection->beginTransaction();
@@ -310,14 +318,25 @@ class ZohoDatabaseCopier
                 ++$processedRecords;
                 $data = [];
                 $types = [];
-                foreach ($table->getColumns() as $column) {
-                    if (in_array($column->getName(), ['id', 'uid'])) {
+                foreach ($tableColumns as $columnName => $columntype) {
+                    if (in_array($columnName, ['id', 'uid'])) {
                         continue;
                     }
-                    $field = $dao->getFieldFromFieldName($column->getName());
+
+                    $field = null;
+                    if (isset($cachedFieldForColumnName[$columnName]) && $cachedFieldForColumnName[$columnName] !== null) {
+                        $field = $cachedFieldForColumnName[$columnName];
+                    }
+                    if (!$field) {
+                        $field = $dao->getFieldFromFieldName($columnName);
+                        if ($field) {
+                            $cachedFieldForColumnName[$columnName] = $field;
+                        }
+                    }
                     if (!$field) {
                         continue;
                     }
+
                     $getterName = $field->getGetter();
                     $dataValue = $record->$getterName();
                     $finalFieldData = null;
@@ -328,8 +347,8 @@ class ZohoDatabaseCopier
                     } else {
                         $finalFieldData = $dataValue;
                     }
-                    $data[$column->getName()] = $finalFieldData;
-                    $types[$column->getName()] = $column->getType()->getName();
+                    $data[$columnName] = $finalFieldData;
+                    $types[$columnName] = $columntype;
                 }
 
                 $select->execute(['id' => $record->getZohoId()]);
