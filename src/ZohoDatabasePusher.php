@@ -33,12 +33,18 @@ class ZohoDatabasePusher
     private $prefix;
 
     /**
+     * @var ZohoChangeListener[]
+     */
+    private $listeners;
+
+    /**
      * @param Connection $connection
      * @param int $apiLimitInsertUpdateDelete
      * @param string $prefix
      * @param LoggerInterface $logger
+     * @param ZohoChangeListener[] $listeners
      */
-    public function __construct(Connection $connection, $apiLimitInsertUpdateDelete = 100, $prefix = 'zoho_', LoggerInterface $logger = null)
+    public function __construct(Connection $connection, $apiLimitInsertUpdateDelete = 100, $prefix = 'zoho_', LoggerInterface $logger = null, array $listeners = [])
     {
         $this->connection = $connection;
         $this->prefix = $prefix;
@@ -51,6 +57,7 @@ class ZohoDatabasePusher
         if ($apiLimitInsertUpdateDelete === null) {
             $this->apiLimitInsertUpdateDelete = 100;
         }
+        $this->listeners = $listeners;
     }
 
     /**
@@ -87,6 +94,7 @@ class ZohoDatabasePusher
             do {
                 $rowsDeleted = [];
                 $zohoBeans = [];
+                $localRecords = [];
                 //@see https://www.zoho.com/crm/help/api/v2/#ra-update-records
                 //To optimize your API usage, get maximum 200 records with each request and insert, update or delete maximum 100 records with each request.
 
@@ -171,6 +179,7 @@ class ZohoDatabasePusher
 
                         $this->logger->debug(sprintf('Updated row %s (id: \'%s\') from table %s added in queue to be pushed.', $record['uid'], $record['id'], $tableName));
                         $zohoBeans[$record['uid']] = $zohoBean;
+                        $localRecords[$record['uid']] = $record;
                         $rowsDeleted[] = $record['uid'];
                     }
                 } else {
@@ -219,11 +228,12 @@ class ZohoDatabasePusher
                         $this->logger->debug(sprintf('New row with uid %s from table %s added in queue to be pushed.', $record['uid'], $tableName));
                         $this->insertDataZohoBean($zohoDao, $zohoBean, $record);
                         $zohoBeans[$record['uid']] = $zohoBean;
+                        $localRecords[$record['uid']] = $record;
                         $rowsDeleted[] = $record['uid'];
                     }
                 }
                 if (count($zohoBeans)) {
-                    $this->sendDataToZohoCleanLocal($zohoDao, $zohoBeans, $rowsDeleted, $update);
+                    $this->sendDataToZohoCleanLocal($zohoDao, $zohoBeans, $rowsDeleted, $update, $localRecords);
                 }
                 $countToPush = $this->countElementInTable($zohoDao, $update);
             } while ($countToPush > 0);
@@ -235,8 +245,9 @@ class ZohoDatabasePusher
      * @param ZohoBeanInterface[] $zohoBeans
      * @param string[] $rowsDeleted
      * @param bool $update
+     * @param mixed[] $localRecords
      */
-    private function sendDataToZohoCleanLocal(AbstractZohoDao $zohoDao, array $zohoBeans, $rowsDeleted, $update = false)
+    private function sendDataToZohoCleanLocal(AbstractZohoDao $zohoDao, array $zohoBeans, $rowsDeleted, $update = false, array $localRecords = [])
     {
         $local_table = $update ? 'local_update' : 'local_insert';
         $tableName = ZohoDatabaseHelper::getTableName($zohoDao, $this->prefix);
@@ -272,6 +283,12 @@ class ZohoDatabasePusher
                         $this->connection->commit();
                         $this->logger->warning(sprintf('Duplicate record found when inserting record with uid %s from the table %s. ID updated: %s. UID deleted: %s', $uid, $tableName, $zohoBean->getZohoId(), $uid));
                     }
+                    $record = $localRecords[$uid];
+                    $record['id'] = $zohoBean->getZohoId();
+
+                    foreach ($this->listeners as $listener) {
+                        $listener->onInsert($record, $zohoDao);
+                    }
                 }
             } else {
                 $errorMessage = sprintf('An error occurred when %s record with uid %s from table %s into Zoho: %s', ($update ? 'updating' : 'inserting'), $uid, $tableName, json_encode($response));
@@ -287,8 +304,9 @@ class ZohoDatabasePusher
             $responseKey++;
         }
     }
-    
-    private function endsWith($haystack, $needle) {
+
+    private function endsWith($haystack, $needle)
+    {
         return substr_compare($haystack, $needle, -strlen($needle)) === 0;
     }
 

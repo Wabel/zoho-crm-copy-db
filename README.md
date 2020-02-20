@@ -124,6 +124,10 @@ Versions
 
 ### 3.2.3
 
+_20 Feb. 2020_
+
+Add listeners when pushing data to Zoho.
+
 _18 Feb. 2020_
 
 Timezone is now used when getting the records with "If-Modified-Since" and using the `zoho_sync_config` table.
