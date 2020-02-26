@@ -191,26 +191,28 @@ class LocalChangesTracker
             $columnName = $this->connection->quoteIdentifier($column->getName());
             $innerCode .= sprintf(
                 '
-                IF NOT(NEW.%s <=> OLD.%s) THEN
-                  REPLACE INTO local_update (table_name, uid, field_name) VALUES (%s, NEW.uid, %s);
-                END IF;
+            IF NOT(NEW.%s <=> OLD.%s) THEN
+                REPLACE INTO local_update (table_name, uid, field_name) VALUES (%s, NEW.uid, %s);
+            END IF;
             ', $columnName, $columnName, $tableNameQuoted, $this->connection->quote($column->getName())
             );
         }
 
         $sql = sprintf(
             '
-            DROP TRIGGER IF EXISTS %s;
-            
-            CREATE TRIGGER %s AFTER UPDATE ON `%s` 
-            FOR EACH ROW
-            BEGIN
-              IF (NEW.modifiedTime <=> OLD.modifiedTime) THEN
-            %s
-              END IF;
-            END;
-            
-            ', $triggerName, $triggerName, $table->getName(), $innerCode
+DROP TRIGGER IF EXISTS %s;
+
+CREATE TRIGGER %s AFTER UPDATE ON `%s` 
+FOR EACH ROW
+BEGIN
+    SET @EXIST_IN_INSERT = (SELECT count(*) FROM local_insert WHERE table_name = \'%s\' AND uid = NEW.uid);
+    IF (@EXIST_IN_INSERT = 0) THEN
+        IF (NEW.modifiedTime <=> OLD.modifiedTime) THEN
+%s
+        END IF;
+    END IF;
+END;
+            ', $triggerName, $triggerName, $table->getName(), $table->getName(), $innerCode
         );
 
         $this->connection->exec($sql);
