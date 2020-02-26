@@ -144,6 +144,9 @@ class ZohoDatabaseCopier
     public function fetchFromZoho(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true, $throwErrors = true, $modifiedSince = null)
     {
         $tableName = ZohoDatabaseHelper::getTableName($dao, $this->prefix);
+        if ($tableName !== 'contacts') {
+            return;
+        }
         $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
         $tableHasColumnModifiedTime = $tableDetail->hasColumn('modifiedTime');
         $tableHasColumnCreatedTime = $tableDetail->hasColumn('createdTime');
@@ -159,6 +162,7 @@ class ZohoDatabaseCopier
         $cachedFieldForColumnName = [];
 
         $zohoSyncConfigTableExists = $this->connection->getSchemaManager()->tablesExist(['zoho_sync_config']);
+        $localUpdateTableExists = $this->connection->getSchemaManager()->tablesExist(['local_update']);
 
         $currentDateTime = new \DateTime();
 
@@ -242,6 +246,7 @@ class ZohoDatabaseCopier
                         $sortOrder = 'asc';
                     }
 
+                    echo $lastActivityTime->format('c'), PHP_EOL;
                     $records = $dao->getRecords(null, $sortColumn, $sortOrder, $lastActivityTime, $recordsPage, 200, $stopAndhasMoreResults);
                     if ($stopAndhasMoreResults) {
 
@@ -368,6 +373,28 @@ class ZohoDatabaseCopier
                     $this->logger->debug(sprintf('Updating record with ID \'%s\' in table %s...', $record->getZohoId(), $tableName));
                     $identifier = ['id' => $record->getZohoId()];
                     $types['id'] = 'string';
+
+                    // If there is some columns updated in local_update, we skip them to avoid Zoho values to overide them
+                    if ($localUpdateTableExists && $result['uid']) {
+                        $selectRecordInLocalUpdate = $this->connection->prepare('SELECT field_name FROM local_update WHERE table_name = "' . $tableName . '" AND uid = :uid');
+                        $selectRecordInLocalUpdate->execute(['uid' => $result['uid']]);
+                        $resultsInLocalUpdate = $selectRecordInLocalUpdate->fetchAll(\PDO::FETCH_ASSOC);
+                        $fieldsUpdated = [];
+                        if (count($resultsInLocalUpdate)) {
+                            foreach ($resultsInLocalUpdate as $resultUpdated) {
+                                $fieldsUpdated[] = $resultUpdated['field_name'];
+                            }
+                            $fieldsUpdated = array_unique($fieldsUpdated);
+                        }
+
+                        if (count($fieldsUpdated)) {
+                            foreach ($fieldsUpdated as $field) {
+                                if (isset($data[$field])) {
+                                    unset($data[$field], $types[$field]);
+                                }
+                            }
+                        }
+                    }
 
                     $recordsModificationCounts['update'] += $this->connection->update($tableName, $data, $identifier, $types);
 

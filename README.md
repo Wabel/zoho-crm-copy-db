@@ -126,7 +126,10 @@ Versions
 
 _26 Feb. 2020_
 
-Change the way update trigger is done. On update, it will check that a row doesn't already exists in `local_insert` first, to avoid wrong value in `local_update` for a new record. 
+Change the way update trigger is done. On update, it will check that a row doesn't already exists in `local_insert` first, to avoid wrong value in `local_update` for a new record.
+
+When fetching update from zoho, if some data have been updated and are present in `local_update`, the data are skipped to avoid override. 
+ 
 _20 Feb. 2020_
 
 Add listeners when pushing data to Zoho.
