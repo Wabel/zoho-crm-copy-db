@@ -144,9 +144,6 @@ class ZohoDatabaseCopier
     public function fetchFromZoho(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true, $throwErrors = true, $modifiedSince = null)
     {
         $tableName = ZohoDatabaseHelper::getTableName($dao, $this->prefix);
-        if ($tableName !== 'contacts') {
-            return;
-        }
         $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
         $tableHasColumnModifiedTime = $tableDetail->hasColumn('modifiedTime');
         $tableHasColumnCreatedTime = $tableDetail->hasColumn('createdTime');
