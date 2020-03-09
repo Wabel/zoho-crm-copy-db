@@ -78,6 +78,10 @@ class ZohoSyncDatabaseCommand extends Command
      * @var string[]
      */
     private $excludedZohoDao;
+    /**
+     * @var string[]
+     */
+    private $excludedDaosFromPush;
 
 
     /**
@@ -91,10 +95,20 @@ class ZohoSyncDatabaseCommand extends Command
      * @param MultiLogger $logger
      * @param Lock $lock A lock that can be used to avoid running the same command (copy) twice at the same time
      * @param string[] $excludedZohoDao To exclude Dao and or solve Dao which can create ZohoResponse Error
+     * @param string[] $excludedDaosFromPush Daos excluded during push to Zoho
      */
-    public function __construct(ZohoDatabaseModelSync $zohoDatabaseModelSync, ZohoDatabaseCopier $zohoDatabaseCopier, ZohoDatabasePusher $zohoDatabaseSync,
-                                EntitiesGeneratorService $zohoEntitiesGenerator, ZohoClient $zohoClient,
-                                $pathZohoDaos, $namespaceZohoDaos, MultiLogger $logger, Lock $lock = null, $excludedZohoDao = []
+    public function __construct(
+        ZohoDatabaseModelSync $zohoDatabaseModelSync,
+        ZohoDatabaseCopier $zohoDatabaseCopier,
+        ZohoDatabasePusher $zohoDatabaseSync,
+        EntitiesGeneratorService $zohoEntitiesGenerator,
+        ZohoClient $zohoClient,
+        $pathZohoDaos,
+        $namespaceZohoDaos,
+        MultiLogger $logger,
+        Lock $lock = null,
+        $excludedZohoDao = [],
+        $excludedDaosFromPush = []
     )
     {
         parent::__construct();
@@ -108,6 +122,7 @@ class ZohoSyncDatabaseCommand extends Command
         $this->logger = $logger;
         $this->lock = $lock;
         $this->excludedZohoDao = $excludedZohoDao;
+        $this->excludedDaosFromPush = $excludedDaosFromPush;
     }
 
     protected function configure()
@@ -324,6 +339,10 @@ class ZohoSyncDatabaseCommand extends Command
     {
         $this->logger->notice('Starting to push data from local database into Zoho CRM...');
         foreach ($this->zohoDaos as $zohoDao) {
+            if (in_array(get_class($zohoDao), $this->excludedDaosFromPush, true)) {
+                $this->logger->notice(sprintf('%s has been excluded from push', get_class($zohoDao)));
+                continue;
+            }
             if ($zohoDao->getFieldFromFieldName('createdTime')) {
                 $this->zohoDatabaseSync->pushToZoho($zohoDao);
             }

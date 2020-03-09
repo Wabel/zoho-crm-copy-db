@@ -124,6 +124,10 @@ Versions
 
 ### 3.2.3
 
+_09 Mar. 2020_
+
+Add an option in the command in order to exclude some Modules to be pushed on Zoho.
+
 _26 Feb. 2020_
 
 Change the way update trigger is done. On update, it will check that a row doesn't already exists in `local_insert` first, to avoid wrong value in `local_update` for a new record.

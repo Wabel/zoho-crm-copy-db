@@ -243,7 +243,6 @@ class ZohoDatabaseCopier
                         $sortOrder = 'asc';
                     }
 
-                    echo $lastActivityTime->format('c'), PHP_EOL;
                     $records = $dao->getRecords(null, $sortColumn, $sortOrder, $lastActivityTime, $recordsPage, 200, $stopAndhasMoreResults);
                     if ($stopAndhasMoreResults) {
 
