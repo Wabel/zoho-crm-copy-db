@@ -416,6 +416,7 @@ class ZohoDatabasePusher
                 ]
             );
         $results = $statement->execute();
+        $this->logger->notice($results->rowCount() . ' records to delete into Zoho for module ' . $zohoDao->getPluralModuleName());
         while ($row = $results->fetch()) {
             $zohoDao->delete($row['id']);
             $this->connection->delete($localTable, ['table_name' => $tableName, 'id' => $row['id']]);

@@ -122,6 +122,14 @@ $databaseCopier = new ZohoDatabaseCopier($connection, "my_prefix_", [ $listener 
 Versions
 --------
 
+### 3.2.4
+
+_18 Mar. 2020_
+
+Fetch from zoho script has been reworked to include pagination on deleted records too.
+
+Non-incremental synchro will now get records 200 by 200 to avoid memory loss.
+
 ### 3.2.3
 
 _09 Mar. 2020_

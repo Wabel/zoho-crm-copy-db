@@ -137,11 +137,8 @@ class ZohoDatabaseCopier
      * @param bool $throwErrors
      * @param string $modifiedSince
      *
-     * @throws \Doctrine\DBAL\DBALException
-     * @throws \Doctrine\DBAL\Schema\SchemaException
-     * @throws \Wabel\Zoho\CRM\Exception\ZohoCRMResponseException
      */
-    public function fetchFromZoho(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true, $throwErrors = true, $modifiedSince = null)
+    public function fetchFromZoho(AbstractZohoDao $dao, $incrementalSync = true, $twoWaysSync = true, $throwErrors = true, $modifiedSince = null): void
     {
         $tableName = ZohoDatabaseHelper::getTableName($dao, $this->prefix);
         $tableDetail = $this->connection->getSchemaManager()->listTableDetails($tableName);
@@ -163,134 +160,100 @@ class ZohoDatabaseCopier
 
         $currentDateTime = new \DateTime();
 
-        $totalRecords = 0;
-        $totalRecordsDeleted = 0;
+        // First step, we determine the oldest date to get records from
+        $dateModifiedSince = null;
+        if ($incrementalSync) {
+            // For incremental copy, we search the best date in config table or according the the latest value in the table
+            $this->logger->info('Incremental synchronization started');
+            $findDateByModifiedTime = false;
 
-        $recordsPage = 1;
+            // We check if the synchronization date exists in config table
+            if ($zohoSyncConfigTableExists && $modifiedSince === null) {
+                $lastDateInConfig = $this->connection->fetchColumn('SELECT config_value FROM zoho_sync_config WHERE config_key = ? AND table_name = ?', [
+                    'FETCH_RECORDS_MODIFIED_SINCE__DATE',
+                    $tableName
+                ]);
+                if ($lastDateInConfig !== false) {
+                    $lastPageInConfig = $this->connection->fetchColumn('SELECT config_value FROM zoho_sync_config WHERE config_key = ? AND table_name = ?', [
+                        'FETCH_RECORDS_MODIFIED_SINCE__PAGE',
+                        $tableName
+                    ]);
+                    if ($lastPageInConfig === false) {
+                        $lastPageInConfig = '1';
+                    }
+                    $dateModifiedSince = new \DateTime($lastDateInConfig, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
+                    $recordsPage = (int)$lastPageInConfig;
+                } else {
+                    $findDateByModifiedTime = true;
+                }
+            } else {
+                $findDateByModifiedTime = true;
+            }
+
+            // If no synchronization date found, we search according to the latest value from 'modified/created time' from the table
+            if ($findDateByModifiedTime) {
+                if ($modifiedSince) {
+                    $dateModifiedSince = new \DateTime($modifiedSince);
+                } else {
+                    $latestDateValue = null;
+                    if ($tableHasColumnModifiedTime) {
+                        $latestDateValue = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
+                    }
+                    if (!$latestDateValue && $tableHasColumnCreatedTime) {
+                        $latestDateValue = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
+                    }
+
+                    if ($latestDateValue !== null) {
+                        $dateModifiedSince = new \DateTime($latestDateValue, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
+                        // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
+                        $dateModifiedSince->add(new \DateInterval('PT1S'));
+                    }
+                }
+            }
+        } else {
+            $this->logger->info('Full synchronization started');
+            // In case of incremental sync, we first check if a specific date exists in input
+            // Otherwise we start to get records since the beginning
+            if ($modifiedSince !== null) {
+                $dateModifiedSince = new \DateTime($modifiedSince);
+            }
+        }
+
+        if ($dateModifiedSince) {
+            $this->logger->notice(sprintf('Synchronization started from %s for module %s', $dateModifiedSince->format('c'), $dao->getPluralModuleName()));
+        } else {
+            $this->logger->notice(sprintf('Synchronization started from the beginning of time for module %s', $dao->getPluralModuleName()));
+        }
+
+        $sortColumn = null;
+        $sortOrder = null;
+
+        if ($tableHasColumnModifiedTime) {
+            $sortColumn = 'Modified_Time';
+            $sortOrder = 'asc';
+        } else if ($tableHasColumnCreatedTime) {
+            $sortColumn = 'Created_Time';
+            $sortOrder = 'asc';
+        }
+
         $stopAndhasMoreResults = true;
         $recordsPaginationLastTime = null;
 
+        $recordsModificationCounts = [
+            'insert' => 0,
+            'update' => 0,
+            'delete' => 0,
+        ];
+
+        $recordsPage = 1;
+
+        // Second step, we loop on every records to update
         while ($stopAndhasMoreResults) {
+            // Fetch of the records, 200 per 200, to avoid memory loss
             try {
-                if ($incrementalSync) {
-                    if ($recordsPage === 1) {
-                        // Let's get the last modification date:
-                        /** @var \DateTime|null $lastActivityTime */
-                        $lastActivityTime = null;
-
-                        $findDateByModifiedTime = false;
-
-                        if ($zohoSyncConfigTableExists && $modifiedSince === null) {
-                            $lastDateInConfig = $this->connection->fetchColumn('SELECT config_value FROM zoho_sync_config WHERE config_key = ? AND table_name = ?', [
-                                'FETCH_RECORDS_MODIFIED_SINCE__DATE',
-                                $tableName
-                            ]);
-                            if ($lastDateInConfig !== false) {
-                                $lastPageInConfig = $this->connection->fetchColumn('SELECT config_value FROM zoho_sync_config WHERE config_key = ? AND table_name = ?', [
-                                    'FETCH_RECORDS_MODIFIED_SINCE__PAGE',
-                                    $tableName
-                                ]);
-                                if ($lastPageInConfig === false) {
-                                    $lastPageInConfig = '1';
-                                }
-                                $lastActivityTime = new \DateTime($lastDateInConfig, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
-                                $recordsPage = (int)$lastPageInConfig;
-                            } else {
-                                $findDateByModifiedTime = true;
-                            }
-                        } else {
-                            $findDateByModifiedTime = true;
-                        }
-
-                        if ($findDateByModifiedTime) {
-                            if ($modifiedSince) {
-                                $lastActivityTime = new \DateTime($modifiedSince);
-                            } else {
-                                if ($tableHasColumnModifiedTime) {
-                                    $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
-                                }
-                                if (!$lastActivityTime && $tableHasColumnCreatedTime) {
-                                    $lastActivityTime = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
-                                }
-
-                                if ($lastActivityTime !== null) {
-                                    $lastActivityTime = new \DateTime($lastActivityTime, new \DateTimeZone($dao->getZohoClient()->getTimezone()));
-                                    // Let's add one second to the last activity time (otherwise, we are fetching again the last record in DB).
-                                    $lastActivityTime->add(new \DateInterval('PT1S'));
-                                }
-                            }
-                        }
-
-                        if ($lastActivityTime) {
-                            $this->logger->info(sprintf('Incremental copy from %s started for module %s', $lastActivityTime->format(\DateTime::ATOM), $dao->getPluralModuleName()));
-                        } else {
-                            $this->logger->info(sprintf('Incremental copy started for module %s', $dao->getPluralModuleName()));
-                        }
-                    } else {
-                        $lastActivityTime = $recordsPaginationLastTime;
-                    }
-
-                    $this->logger->notice(sprintf('Fetching the records to insert/update for module %s...', $dao->getPluralModuleName()));
-
-                    $sortColumn = null;
-                    $sortOrder = null;
-
-                    if ($tableHasColumnModifiedTime) {
-                        $sortColumn = 'Modified_Time';
-                        $sortOrder = 'asc';
-                    } else if ($tableHasColumnCreatedTime) {
-                        $sortColumn = 'Created_Time';
-                        $sortOrder = 'asc';
-                    }
-
-                    $records = $dao->getRecords(null, $sortColumn, $sortOrder, $lastActivityTime, $recordsPage, 200, $stopAndhasMoreResults);
-                    if ($stopAndhasMoreResults) {
-
-                        if ($zohoSyncConfigTableExists) {
-                            $lastDate = $lastActivityTime ? $lastActivityTime->format('Y-m-d H:i:s') : date('Y-m-d H:i:s', 0);
-                            $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__DATE', $tableName, $lastDate);
-                            $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__PAGE', $tableName, (string)$recordsPage);
-                        }
-
-                        $recordsPaginationLastTime = $lastActivityTime;
-                        $recordsPage++;
-                    } else {
-                        if ($zohoSyncConfigTableExists) {
-                            $latestDateToSave = $currentDateTime->format('Y-m-d H:i:s');
-                            if ($tableHasColumnModifiedTime) {
-                                $latestDateToSave = $this->connection->fetchColumn('SELECT MAX(modifiedTime) FROM ' . $tableName);
-                            }
-                            if (!$latestDateToSave && $tableHasColumnCreatedTime) {
-                                $latestDateToSave = $this->connection->fetchColumn('SELECT MAX(createdTime) FROM ' . $tableName);
-                            }
-                            if (!$latestDateToSave) {
-                                $latestDateToSave = $currentDateTime->format('Y-m-d H:i:s');
-                            }
-                            $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__DATE', $tableName, $latestDateToSave);
-                            $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__PAGE', $tableName, '1');
-                        }
-                    }
-                    $totalRecords = count($records);
-                    $this->logger->debug($totalRecords . ' records fetched.');
-                    $deletedRecords = [];
-                    $totalRecordsDeleted = 0;
-                    if (($recordsPage - 1) === 1) {
-                        $this->logger->notice(sprintf('Fetching the records to delete for module %s...', $dao->getPluralModuleName()));
-                        $deletedRecords = $dao->getDeletedRecordIds($lastActivityTime);
-                        $totalRecordsDeleted = count($deletedRecords);
-                        $this->logger->debug($totalRecordsDeleted . ' records fetched.');
-                    }
-                } else {
-                    $this->logger->info(sprintf('Full copy started for module %s', $dao->getPluralModuleName()));
-                    $this->logger->notice(sprintf('Fetching the records to insert/update for module ...%s', $dao->getPluralModuleName()));
-                    $records = $dao->getRecords();
-                    $totalRecords = count($records);
-                    $this->logger->debug($totalRecords . ' records fetched.');
-                    $deletedRecords = [];
-                    $stopAndhasMoreResults = false;
-                }
+                $records = $dao->getRecords(null, $sortColumn, $sortOrder, $dateModifiedSince, $recordsPage, 200, $stopAndhasMoreResults);
             } catch (ZCRMException $exception) {
-                $this->logger->error('Error when getting records for module ' . $dao->getPluralModuleName() . ': ' . $exception->getMessage(), [
+                $this->logger->error('Error when getting updated records for module ' . $dao->getPluralModuleName() . ' and page ' . $recordsPage . ': ' . $exception->getMessage(), [
                     'exception' => $exception
                 ]);
                 if ($throwErrors) {
@@ -298,140 +261,14 @@ class ZohoDatabaseCopier
                 }
                 return;
             }
-            $this->logger->info(sprintf('Inserting/updating %s records into table %s...', $totalRecords, $tableName));
-
-            $select = $this->connection->prepare('SELECT * FROM ' . $tableName . ' WHERE id = :id');
-
-            $this->connection->beginTransaction();
-
-            $recordsModificationCounts = [
-                'insert' => 0,
-                'update' => 0,
-                'delete' => 0,
-            ];
-
-            $logOffset = $totalRecords >= 500 ? 100 : 50;
-            $processedRecords = 0;
-            foreach ($records as $record) {
-                if (($processedRecords % $logOffset) === 0) {
-                    $this->logger->info(sprintf('%d/%s records processed for module %s', $processedRecords, $totalRecords, $dao->getPluralModuleName()));
+            if ($stopAndhasMoreResults) {
+                if ($zohoSyncConfigTableExists) {
+                    $lastDate = $dateModifiedSince ? $dateModifiedSince->format('Y-m-d H:i:s') : $currentDateTime->format('Y-m-d H:i:s');
+                    $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__DATE', $tableName, $lastDate);
+                    $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__PAGE', $tableName, (string)$recordsPage);
                 }
-                ++$processedRecords;
-                $data = [];
-                $types = [];
-                foreach ($tableColumns as $columnName => $columntype) {
-                    if (in_array($columnName, ['id', 'uid'])) {
-                        continue;
-                    }
-
-                    $field = null;
-                    if (isset($cachedFieldForColumnName[$columnName]) && $cachedFieldForColumnName[$columnName] !== null) {
-                        $field = $cachedFieldForColumnName[$columnName];
-                    }
-                    if (!$field) {
-                        $field = $dao->getFieldFromFieldName($columnName);
-                        if ($field) {
-                            $cachedFieldForColumnName[$columnName] = $field;
-                        }
-                    }
-                    if (!$field) {
-                        continue;
-                    }
-
-                    $getterName = $field->getGetter();
-                    $dataValue = $record->$getterName();
-                    $finalFieldData = null;
-                    if ($dataValue instanceof ZCRMRecord) {
-                        $finalFieldData = $dataValue->getEntityId();
-                    } elseif (is_array($dataValue)) {
-                        $finalFieldData = implode(';', $dataValue);
-                    } else {
-                        $finalFieldData = $dataValue;
-                    }
-                    $data[$columnName] = $finalFieldData;
-                    $types[$columnName] = $columntype;
-                }
-
-                $select->execute(['id' => $record->getZohoId()]);
-                $result = $select->fetch(\PDO::FETCH_ASSOC);
-                if ($result === false) {
-                    $this->logger->debug(sprintf('Inserting record with ID \'%s\' in table %s...', $record->getZohoId(), $tableName));
-
-                    $data['id'] = $record->getZohoId();
-                    $types['id'] = 'string';
-
-                    $recordsModificationCounts['insert'] += $this->connection->insert($tableName, $data, $types);
-
-                    foreach ($this->listeners as $listener) {
-                        $listener->onInsert($data, $dao);
-                    }
-                } else {
-                    $this->logger->debug(sprintf('Updating record with ID \'%s\' in table %s...', $record->getZohoId(), $tableName));
-                    $identifier = ['id' => $record->getZohoId()];
-                    $types['id'] = 'string';
-
-                    // If there is some columns updated in local_update, we skip them to avoid Zoho values to overide them
-                    if ($localUpdateTableExists && $result['uid']) {
-                        $selectRecordInLocalUpdate = $this->connection->prepare('SELECT field_name FROM local_update WHERE table_name = "' . $tableName . '" AND uid = :uid');
-                        $selectRecordInLocalUpdate->execute(['uid' => $result['uid']]);
-                        $resultsInLocalUpdate = $selectRecordInLocalUpdate->fetchAll(\PDO::FETCH_ASSOC);
-                        $fieldsUpdated = [];
-                        if (count($resultsInLocalUpdate)) {
-                            foreach ($resultsInLocalUpdate as $resultUpdated) {
-                                $fieldsUpdated[] = $resultUpdated['field_name'];
-                            }
-                            $fieldsUpdated = array_unique($fieldsUpdated);
-                        }
-
-                        if (count($fieldsUpdated)) {
-                            foreach ($fieldsUpdated as $field) {
-                                if (isset($data[$field])) {
-                                    unset($data[$field], $types[$field]);
-                                }
-                            }
-                        }
-                    }
-
-                    $recordsModificationCounts['update'] += $this->connection->update($tableName, $data, $identifier, $types);
-
-                    // Let's add the id for the update trigger
-                    $data['id'] = $record->getZohoId();
-                    foreach ($this->listeners as $listener) {
-                        $listener->onUpdate($data, $result, $dao);
-                    }
-                }
-            }
-
-            $this->logger->info(sprintf('Deleting %d records from table %s...', $totalRecordsDeleted, $tableName));
-            $sqlStatementUid = 'select uid from ' . $this->connection->quoteIdentifier($tableName) . ' where id = :id';
-            $processedRecords = 0;
-            $logOffset = $totalRecordsDeleted >= 500 ? 100 : 50;
-            foreach ($deletedRecords as $deletedRecord) {
-                if (($processedRecords % $logOffset) === 0) {
-                    $this->logger->info(sprintf('%d/%d records processed for module %s', $processedRecords, $totalRecordsDeleted, $dao->getPluralModuleName()));
-                }
-                ++$processedRecords;
-                $this->logger->debug(sprintf('Deleting record with ID \'%s\' in table %s...', $deletedRecord->getEntityId(), $tableName));
-                $uid = $this->connection->fetchColumn($sqlStatementUid, ['id' => $deletedRecord->getEntityId()]);
-                $recordsModificationCounts['delete'] += $this->connection->delete($tableName, ['id' => $deletedRecord->getEntityId()]);
-                if ($twoWaysSync) {
-                    // TODO: we could detect if there are changes to be updated to the server and try to warn with a log message
-                    // Also, let's remove the newly created field (because of the trigger) to avoid looping back to Zoho
-                    $this->connection->delete('local_delete', ['table_name' => $tableName, 'id' => $deletedRecord->getEntityId()]);
-                    $this->connection->delete('local_update', ['table_name' => $tableName, 'uid' => $uid]);
-                }
-            }
-
-            $this->logger->notice(sprintf('Copy finished with %d item(s) inserted, %d item(s) updated and %d item(s) deleted.',
-                $recordsModificationCounts['insert'],
-                $recordsModificationCounts['update'],
-                $recordsModificationCounts['delete']
-            ));
-
-            $this->connection->commit();
-
-            if (($recordsModificationCounts['insert'] === 0 && $recordsModificationCounts['update'] === 0 && $recordsModificationCounts['delete'] === 0) || $stopAndhasMoreResults === false) {
-                $stopAndhasMoreResults = false;
+                $recordsPage++;
+            } else {
                 if ($zohoSyncConfigTableExists) {
                     $latestDateToSave = $currentDateTime->format('Y-m-d H:i:s');
                     if ($tableHasColumnModifiedTime) {
@@ -447,7 +284,181 @@ class ZohoDatabaseCopier
                     $this->upsertZohoConfig('FETCH_RECORDS_MODIFIED_SINCE__PAGE', $tableName, '1');
                 }
             }
+            $totalRecords = count($records);
+            $this->logger->debug($totalRecords . ' records fetched.');
+
+            // Save of the records in db
+            $this->logger->info(sprintf('Inserting/updating %s records into table %s...', $totalRecords, $tableName));
+            $select = $this->connection->prepare('SELECT * FROM ' . $tableName . ' WHERE id = :id');
+            $this->connection->beginTransaction();
+            $logOffset = (int)ceil($totalRecords / 4);
+            $processedRecords = 0;
+            $dataInsertedInDb = 0;
+            $dataUpdatedInDb = 0;
+            if ($totalRecords) {
+                foreach ($records as $record) {
+                    if ($processedRecords !== 0 && ($processedRecords % $logOffset) === 0) {
+                        $this->logger->info(sprintf('%d/%s records processed for module %s', $processedRecords, $totalRecords, $dao->getPluralModuleName()));
+                    }
+                    ++$processedRecords;
+
+                    // Get column type dans data
+                    $data = [];
+                    $types = [];
+                    foreach ($tableColumns as $columnName => $columntype) {
+                        if (in_array($columnName, ['id', 'uid'])) {
+                            continue;
+                        }
+
+                        $field = null;
+                        if (isset($cachedFieldForColumnName[$columnName]) && $cachedFieldForColumnName[$columnName] !== null) {
+                            $field = $cachedFieldForColumnName[$columnName];
+                        }
+                        if (!$field) {
+                            $field = $dao->getFieldFromFieldName($columnName);
+                            if ($field) {
+                                $cachedFieldForColumnName[$columnName] = $field;
+                            }
+                        }
+                        if (!$field) {
+                            continue;
+                        }
+
+                        $getterName = $field->getGetter();
+                        $dataValue = $record->$getterName();
+                        $finalFieldData = null;
+                        if ($dataValue instanceof ZCRMRecord) {
+                            $finalFieldData = $dataValue->getEntityId();
+                        } elseif (is_array($dataValue)) {
+                            $finalFieldData = implode(';', $dataValue);
+                        } else {
+                            $finalFieldData = $dataValue;
+                        }
+                        $data[$columnName] = $finalFieldData;
+                        $types[$columnName] = $columntype;
+                    }
+
+                    // Start to insert/update
+                    $select->execute(['id' => $record->getZohoId()]);
+                    $result = $select->fetch(\PDO::FETCH_ASSOC);
+                    if ($result === false) {
+                        $this->logger->debug(sprintf('Inserting record with ID \'%s\' in table %s...', $record->getZohoId(), $tableName));
+
+                        $data['id'] = $record->getZohoId();
+                        $types['id'] = 'string';
+
+                        $dataInsertedInDb += $this->connection->insert($tableName, $data, $types);
+
+                        foreach ($this->listeners as $listener) {
+                            $listener->onInsert($data, $dao);
+                        }
+                    } else {
+                        $this->logger->debug(sprintf('Updating record with ID \'%s\' in table %s...', $record->getZohoId(), $tableName));
+                        $identifier = ['id' => $record->getZohoId()];
+                        $types['id'] = 'string';
+
+                        // If there is some columns updated in local_update, we skip them to avoid Zoho values to overide them
+                        if ($localUpdateTableExists && $result['uid']) {
+                            $selectRecordInLocalUpdate = $this->connection->prepare('SELECT field_name FROM local_update WHERE table_name = "' . $tableName . '" AND uid = :uid');
+                            $selectRecordInLocalUpdate->execute(['uid' => $result['uid']]);
+                            $resultsInLocalUpdate = $selectRecordInLocalUpdate->fetchAll(\PDO::FETCH_ASSOC);
+                            $fieldsUpdated = [];
+                            if (count($resultsInLocalUpdate)) {
+                                foreach ($resultsInLocalUpdate as $resultUpdated) {
+                                    $fieldsUpdated[] = $resultUpdated['field_name'];
+                                }
+                                $fieldsUpdated = array_unique($fieldsUpdated);
+                            }
+
+                            if (count($fieldsUpdated)) {
+                                foreach ($fieldsUpdated as $field) {
+                                    if (isset($data[$field])) {
+                                        unset($data[$field], $types[$field]);
+                                    }
+                                }
+                            }
+                        }
+
+                        $dataUpdatedInDb += $this->connection->update($tableName, $data, $identifier, $types);
+
+                        // Let's add the id for the update trigger
+                        $data['id'] = $record->getZohoId();
+                        foreach ($this->listeners as $listener) {
+                            $listener->onUpdate($data, $result, $dao);
+                        }
+                    }
+                }
+            }
+            $recordsModificationCounts['insert'] += $dataInsertedInDb;
+            $recordsModificationCounts['update'] += $dataUpdatedInDb;
+
+            if ($totalRecords === 0) {
+                $stopAndhasMoreResults = false;
+            }
+
+            $this->connection->commit();
         }
+
+        // Third step, we loop on every records to delete
+        $stopAndhasMoreResults = true;
+        $recordsDeletedPage = 1;
+        while ($stopAndhasMoreResults) {
+            // Fetch of the records, 200 per 200, to avoid memory loss
+            try {
+                $deletedRecords = $dao->getDeletedRecordIds($dateModifiedSince, $recordsDeletedPage, 200, $stopAndhasMoreResults);
+            } catch (ZCRMException $exception) {
+                $this->logger->error('Error when getting deleted records for module ' . $dao->getPluralModuleName() . ' and page ' . $recordsDeletedPage . ': ' . $exception->getMessage(), [
+                    'exception' => $exception
+                ]);
+                if ($throwErrors) {
+                    throw $exception;
+                }
+                return;
+            }
+            if ($stopAndhasMoreResults) {
+                ++$recordsDeletedPage;
+            }
+            $totalRecordsDeleted = count($deletedRecords);
+            $this->logger->debug($totalRecordsDeleted . ' records fetched.');
+
+            $this->logger->info(sprintf('Deleting %d records from table %s...', $totalRecordsDeleted, $tableName));
+            $this->connection->beginTransaction();
+            $sqlStatementUid = 'select uid from ' . $this->connection->quoteIdentifier($tableName) . ' where id = :id';
+            $processedRecords = 0;
+            $logOffset = (int)ceil($totalRecordsDeleted / 4);
+            $dataDeletedInDb = 0;
+            if ($totalRecordsDeleted) {
+                foreach ($deletedRecords as $deletedRecord) {
+                    if ($processedRecords !== 0 && ($processedRecords % $logOffset) === 0) {
+                        $this->logger->info(sprintf('%d/%d records processed for module %s', $processedRecords, $totalRecordsDeleted, $dao->getPluralModuleName()));
+                    }
+                    ++$processedRecords;
+                    $this->logger->debug(sprintf('Deleting record with ID \'%s\' in table %s...', $deletedRecord->getEntityId(), $tableName));
+                    $uid = $this->connection->fetchColumn($sqlStatementUid, ['id' => $deletedRecord->getEntityId()]);
+                    $dataDeletedInDb += $this->connection->delete($tableName, ['id' => $deletedRecord->getEntityId()]);
+                    if ($twoWaysSync) {
+                        // Also, let's remove the newly created field (because of the trigger) to avoid looping back to Zoho
+                        $this->connection->delete('local_delete', ['table_name' => $tableName, 'id' => $deletedRecord->getEntityId()]);
+                        $this->connection->delete('local_update', ['table_name' => $tableName, 'uid' => $uid]);
+                    }
+                }
+            }
+            $recordsModificationCounts['delete'] += $dataDeletedInDb;
+
+            if (!$totalRecordsDeleted === 0) {
+                $stopAndhasMoreResults = false;
+            }
+
+            $this->connection->commit();
+        }
+
+        // Last step, we save the current status of the synchronization
+        $this->logger->notice(sprintf('Synchronization finished with %d item(s) inserted, %d item(s) updated and %d item(s) deleted for module %s.',
+            $recordsModificationCounts['insert'],
+            $recordsModificationCounts['update'],
+            $recordsModificationCounts['delete'],
+            $dao->getPluralModuleName()
+        ));
     }
 
     public function fetchFromZohoInBulk(AbstractZohoDao $dao)
