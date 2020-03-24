@@ -372,9 +372,8 @@ class ZohoDatabaseCopier
 
                             if (count($fieldsUpdated)) {
                                 foreach ($fieldsUpdated as $field) {
-                                    if (isset($data[$field])) {
-                                        unset($data[$field], $types[$field]);
-                                    }
+                                    $data = array_diff_key($data, [$field => 'XXXdumb_valueXXX']);
+                                    $types = array_diff_key($types, [$field => 'XXXdumb_valueXXX']);
                                 }
                             }
                         }

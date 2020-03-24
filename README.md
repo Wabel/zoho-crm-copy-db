@@ -133,7 +133,9 @@ Also fixed: when a local tracking table is updated, the triggers will be re-crea
 
 For now, the previous value of a record is only used in the Tag case. Here an example of the synchro:  
 If a record is updated (previous tags: `tag1;tag2`, new tags: `tag1;tag3`) then the synchro will first update the other columns, then, it will update the tags (Zoho API is handling the tags in a different way).  
-In the case of a delete (previous tags: `tag1;tag3`, new tags: `null`), the synchro will check the previous value stored in teh tracking table, and will remove the tags via the API. 
+In the case of a delete (previous tags: `tag1;tag3`, new tags: `null`), the synchro will check the previous value stored in teh tracking table, and will remove the tags via the API.
+
+Fix an issue in the method to fetch records updated from Zoho where some NULL fields were not skipped correctly even if present in tracking table. 
 
 ### 3.2.4
 
