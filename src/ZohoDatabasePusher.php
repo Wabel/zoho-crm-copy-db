@@ -6,9 +6,12 @@ use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
+use Wabel\Zoho\CRM\Helpers\BeanHelper;
 use Wabel\Zoho\CRM\Service\EntitiesGeneratorService;
 use Wabel\Zoho\CRM\ZohoBeanInterface;
 use zcrmsdk\crm\api\response\EntityResponse;
+use zcrmsdk\crm\crud\ZCRMRecord;
+use zcrmsdk\crm\exception\ZCRMException;
 
 /**
  * Description of ZohoDatabasePusher.
@@ -95,6 +98,7 @@ class ZohoDatabasePusher
                 $rowsDeleted = [];
                 $zohoBeans = [];
                 $localRecords = [];
+                $localPreviousRecordValues = [];
                 //@see https://www.zoho.com/crm/help/api/v2/#ra-update-records
                 //To optimize your API usage, get maximum 200 records with each request and insert, update or delete maximum 100 records with each request.
 
@@ -147,7 +151,7 @@ class ZohoDatabasePusher
 
                         $fieldsUpdatedQuery = $this->connection->createQueryBuilder();
                         $fieldsUpdatedQuery
-                            ->select('field_name')
+                            ->select('field_name', 'previous_value')
                             ->from($localTable)
                             ->where('uid = :uid')
                             ->andWhere('table_name = :table_name')
@@ -158,10 +162,12 @@ class ZohoDatabasePusher
                             ]);
                         $fieldsUpdatedResults = $fieldsUpdatedQuery->execute()->fetchAll();
 
+                        $previousValues = [];
                         foreach ($fieldsUpdatedResults as $fieldResults) {
                             $columnName = $fieldResults['field_name'];
                             if (array_key_exists($columnName, $record)) {
                                 $this->updateDataZohoBean($zohoDao, $zohoBean, $columnName, $record[$columnName]);
+                                $previousValues[$columnName] = $fieldResults['previous_value'];
                             } else {
                                 $errorMessage = sprintf('Impossible to find the column %s for row with uid %s in the table %s', $columnName, $result['uid'], $tableName);
                                 $this->logger->warning($errorMessage);
@@ -180,6 +186,7 @@ class ZohoDatabasePusher
                         $this->logger->debug(sprintf('Updated row %s (id: \'%s\') from table %s added in queue to be pushed.', $record['uid'], $record['id'], $tableName));
                         $zohoBeans[$record['uid']] = $zohoBean;
                         $localRecords[$record['uid']] = $record;
+                        $localPreviousRecordValues[$record['uid']] = $previousValues;
                         $rowsDeleted[] = $record['uid'];
                     }
                 } else {
@@ -227,13 +234,15 @@ class ZohoDatabasePusher
 
                         $this->logger->debug(sprintf('New row with uid %s from table %s added in queue to be pushed.', $record['uid'], $tableName));
                         $this->insertDataZohoBean($zohoDao, $zohoBean, $record);
+
                         $zohoBeans[$record['uid']] = $zohoBean;
                         $localRecords[$record['uid']] = $record;
+                        $localPreviousRecordValues[$record['uid']] = [];
                         $rowsDeleted[] = $record['uid'];
                     }
                 }
                 if (count($zohoBeans)) {
-                    $this->sendDataToZohoCleanLocal($zohoDao, $zohoBeans, $rowsDeleted, $update, $localRecords);
+                    $this->sendDataToZohoCleanLocal($zohoDao, $zohoBeans, $rowsDeleted, $update, $localRecords, $localPreviousRecordValues);
                 }
                 $countToPush = $this->countElementInTable($zohoDao, $update);
             } while ($countToPush > 0);
@@ -247,8 +256,9 @@ class ZohoDatabasePusher
      * @param bool $update
      * @param mixed[] $localRecords
      */
-    private function sendDataToZohoCleanLocal(AbstractZohoDao $zohoDao, array $zohoBeans, $rowsDeleted, $update = false, array $localRecords = [])
+    private function sendDataToZohoCleanLocal(AbstractZohoDao $zohoDao, array $zohoBeans, $rowsDeleted, $update = false, array $localRecords = [], array $localPreviousRecordValues = [])
     {
+        $initialZohoBeans = $this->array_clone($zohoBeans);
         $local_table = $update ? 'local_update' : 'local_insert';
         $tableName = ZohoDatabaseHelper::getTableName($zohoDao, $this->prefix);
         $entityResponses = $zohoDao->save($zohoBeans);
@@ -290,6 +300,35 @@ class ZohoDatabasePusher
                         $listener->onInsert($record, $zohoDao);
                     }
                 }
+
+                if (method_exists($initialZohoBeans[$uid], 'setTag')) {
+                    if ($initialZohoBeans[$uid]->isDirty('tag')) {
+                        /** @var ZCRMRecord $zcrmRecord */
+                        $zcrmRecord = $initialZohoBeans[$uid]->getZCRMRecord();
+                        $zcrmRecord->setEntityId($zohoBean->getZohoId());
+                        $zcrmRecord->setModuleApiName($zohoDao->getZCRMModule()->getAPIName());
+                        try {
+                            if ($initialZohoBeans[$uid]->getTag() === null) {
+                                if (isset($localPreviousRecordValues[$uid]['tag']) && !empty($localPreviousRecordValues[$uid]['tag'])) {
+                                    $zcrmRecord->removeTags(explode(';', $localPreviousRecordValues[$uid]['tag']));
+                                }
+                            } else {
+                                $zcrmRecord->addTags(explode(';', $initialZohoBeans[$uid]->getTag()), true);
+                            }
+                        } catch (ZCRMException $ZCRMException) {
+                            $errorMessage = sprintf('Cannot update tags for record uid %s from the table %s. ID updated: %s. Error: %s', $uid, $tableName, $zohoBean->getZohoId(), $ZCRMException->getMessage());
+                            $this->connection->insert('local_update', [
+                                'uid' => $uid,
+                                'table_name' => $tableName,
+                                'field_name' => 'tag',
+                                'error' => $errorMessage,
+                                'errorTime' => date('Y-m-d H:i:s')
+                            ]);
+                            $this->logger->error($errorMessage);
+                        }
+                    }
+                }
+
             } else {
                 $errorMessage = sprintf('An error occurred when %s record with uid %s from table %s into Zoho: %s', ($update ? 'updating' : 'inserting'), $uid, $tableName, json_encode($response));
                 $this->logger->error($errorMessage);
@@ -303,6 +342,18 @@ class ZohoDatabasePusher
             }
             $responseKey++;
         }
+    }
+
+    private function array_clone($array) {
+        return array_map(function($element) {
+            return ((is_array($element))
+                ? $this->array_clone($element)
+                : ((is_object($element))
+                    ? clone $element
+                    : $element
+                )
+            );
+        }, $array);
     }
 
     private function endsWith($haystack, $needle)

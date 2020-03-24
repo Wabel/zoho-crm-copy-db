@@ -39,6 +39,7 @@ class LocalChangesTracker
         $localUpdate->addColumn('table_name', 'string', ['length' => 100]);
         $localUpdate->addColumn('uid', 'string', ['length' => 36]);
         $localUpdate->addColumn('field_name', 'string', ['length' => 100]);
+        $localUpdate->addColumn('previous_value', 'text', ['notnull' => false]);
         $localUpdate->addColumn('error', 'text', ['notnull' => false]);
         $localUpdate->addColumn('errorTime', 'datetime', ['notnull' => false]);
         $localUpdate->setPrimaryKey(array('table_name', 'uid', 'field_name'));
@@ -60,9 +61,10 @@ class LocalChangesTracker
         $localDelete->addUniqueIndex(['id', 'table_name']);
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
-        $dbalTableDiffService->createOrUpdateTable($localUpdate);
-        $dbalTableDiffService->createOrUpdateTable($localInsert);
-        $dbalTableDiffService->createOrUpdateTable($localDelete);
+        $tableUpdateChanged = $dbalTableDiffService->createOrUpdateTable($localUpdate);
+        $tableInsertChanged = $dbalTableDiffService->createOrUpdateTable($localInsert);
+        $tableDeleteChanged = $dbalTableDiffService->createOrUpdateTable($localDelete);
+        return $tableUpdateChanged || $tableInsertChanged || $tableDeleteChanged;
     }
 
     public function hasTriggersInsertUpdateDelete(Table $table)
@@ -192,9 +194,9 @@ class LocalChangesTracker
             $innerCode .= sprintf(
                 '
             IF NOT(NEW.%s <=> OLD.%s) THEN
-                REPLACE INTO local_update (table_name, uid, field_name) VALUES (%s, NEW.uid, %s);
+                REPLACE INTO local_update (table_name, uid, field_name, previous_value) VALUES (%s, NEW.uid, %s, OLD.%s);
             END IF;
-            ', $columnName, $columnName, $tableNameQuoted, $this->connection->quote($column->getName())
+            ', $columnName, $columnName, $tableNameQuoted, $this->connection->quote($column->getName()), $columnName
             );
         }
 

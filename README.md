@@ -122,6 +122,19 @@ $databaseCopier = new ZohoDatabaseCopier($connection, "my_prefix_", [ $listener 
 Versions
 --------
 
+### 3.3.0
+
+_24 Mar. 2020_
+
+This new version change the way tags are added/removed for a record.
+
+The local tracking tables are updated to save the previous value of a record when a record is updated.  
+Also fixed: when a local tracking table is updated, the triggers will be re-created for all the tables.
+
+For now, the previous value of a record is only used in the Tag case. Here an example of the synchro:  
+If a record is updated (previous tags: `tag1;tag2`, new tags: `tag1;tag3`) then the synchro will first update the other columns, then, it will update the tags (Zoho API is handling the tags in a different way).  
+In the case of a delete (previous tags: `tag1;tag3`, new tags: `null`), the synchro will check the previous value stored in teh tracking table, and will remove the tags via the API. 
+
 ### 3.2.4
 
 _18 Mar. 2020_

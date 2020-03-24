@@ -41,6 +41,11 @@ class ZohoDatabaseModelSync
     private $trackingTablesDone;
 
     /**
+     * @var bool $localTrackingTablesUpdated
+     */
+    private $localTrackingTablesUpdated;
+
+    /**
      * ZohoDatabaseCopier constructor.
      *
      * @param Connection $connection
@@ -58,6 +63,7 @@ class ZohoDatabaseModelSync
         $this->localChangesTracker = new LocalChangesTracker($connection, $this->logger);
         $this->zohoUserService = $zohoUserService;
         $this->trackingTablesDone = false;
+        $this->localTrackingTablesUpdated = false;
     }
 
     /**
@@ -82,7 +88,7 @@ class ZohoDatabaseModelSync
     public function synchronizeDbModel(AbstractZohoDao $dao, $twoWaysSync, $skipCreateTrigger = false, $recreateTriggers = false)
     {
         if ($twoWaysSync === true && !$this->trackingTablesDone) {
-            $this->localChangesTracker->createTrackingTables();
+            $this->localTrackingTablesUpdated = $this->localChangesTracker->createTrackingTables();
             $this->trackingTablesDone = true;
         }
 
@@ -207,7 +213,7 @@ class ZohoDatabaseModelSync
 
         $dbalTableDiffService = new DbalTableDiffService($this->connection, $this->logger);
         $hasChanges = $dbalTableDiffService->createOrUpdateTable($table);
-        if ($recreateTriggers) {
+        if ($recreateTriggers || $this->localTrackingTablesUpdated) {
             $this->localChangesTracker->createUuidInsertTrigger($table);
             if ($twoWaysSync) {
                 $this->localChangesTracker->createInsertTrigger($table);
