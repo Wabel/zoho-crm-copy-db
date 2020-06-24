@@ -39,6 +39,10 @@ class ZohoDatabasePusher
      * @var ZohoChangeListener[]
      */
     private $listeners;
+    /**
+     * @var mixed[]
+     */
+    private $triggers;
 
     /**
      * @param Connection $connection
@@ -46,8 +50,9 @@ class ZohoDatabasePusher
      * @param string $prefix
      * @param LoggerInterface $logger
      * @param ZohoChangeListener[] $listeners
+     * @param mixed[] $triggers i.e: ['Leads' => ['workflow'], 'Contacts' => ['approval', 'blueprint']]
      */
-    public function __construct(Connection $connection, $apiLimitInsertUpdateDelete = 100, $prefix = 'zoho_', LoggerInterface $logger = null, array $listeners = [])
+    public function __construct(Connection $connection, $apiLimitInsertUpdateDelete = 100, $prefix = 'zoho_', LoggerInterface $logger = null, array $listeners = [], array $triggers = [])
     {
         $this->connection = $connection;
         $this->prefix = $prefix;
@@ -61,6 +66,7 @@ class ZohoDatabasePusher
             $this->apiLimitInsertUpdateDelete = 100;
         }
         $this->listeners = $listeners;
+        $this->triggers = $triggers;
     }
 
     /**
@@ -261,7 +267,12 @@ class ZohoDatabasePusher
         $initialZohoBeans = $this->array_clone($zohoBeans);
         $local_table = $update ? 'local_update' : 'local_insert';
         $tableName = ZohoDatabaseHelper::getTableName($zohoDao, $this->prefix);
-        $entityResponses = $zohoDao->save($zohoBeans);
+
+        $zohoApiName = $zohoDao->getZCRMModule()->getAPIName();
+
+        $triggers = isset($this->triggers[$zohoApiName]) ? $this->triggers[$zohoApiName] : [];
+
+        $entityResponses = $zohoDao->save($zohoBeans, $triggers);
         $responseKey = 0;
         foreach ($zohoBeans as $uid => $zohoBean) {
             $response = $entityResponses[$responseKey]->getResponseJSON();
@@ -306,7 +317,7 @@ class ZohoDatabasePusher
                         /** @var ZCRMRecord $zcrmRecord */
                         $zcrmRecord = $initialZohoBeans[$uid]->getZCRMRecord();
                         $zcrmRecord->setEntityId($zohoBean->getZohoId());
-                        $zcrmRecord->setModuleApiName($zohoDao->getZCRMModule()->getAPIName());
+                        $zcrmRecord->setModuleApiName($zohoApiName);
                         try {
                             if ($initialZohoBeans[$uid]->getTag() === null) {
                                 if (isset($localPreviousRecordValues[$uid]['tag']) && !empty($localPreviousRecordValues[$uid]['tag'])) {

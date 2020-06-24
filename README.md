@@ -122,6 +122,26 @@ $databaseCopier = new ZohoDatabaseCopier($connection, "my_prefix_", [ $listener 
 Versions
 --------
 
+### 3.4.0
+
+_24 Jun. 2020_
+
+When a record is pushed to Zoho, it will also enable some triggers.
+
+The triggers can be enabled in constructor parameter with the list of triggers to enable.  
+By default, as backward compatibility until now, an empty array is used if no triggers found in the configuration.
+
+Ex:
+
+```
+[
+    'Accounts' => ['blueprint'],
+    'Contacts' => ['approval', 'blueprint'],
+    'Leads' => ['workflow'],
+    '<API name>' => [<list of trigger name>]
+]
+```
+
 ### 3.3.0
 
 _24 Mar. 2020_
