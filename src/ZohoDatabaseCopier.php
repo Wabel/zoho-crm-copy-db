@@ -7,6 +7,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Wabel\Zoho\CRM\AbstractZohoDao;
 use Wabel\Zoho\CRM\ZohoClient;
+use zcrmsdk\crm\api\handler\OrganizationAPIHandler;
 use zcrmsdk\crm\crud\ZCRMRecord;
 use zcrmsdk\crm\exception\ZCRMException;
 use ZipArchive;
@@ -70,7 +71,7 @@ class ZohoDatabaseCopier
      */
     public function fetchUserFromZoho()
     {
-        $users = $this->zohoUserService->getUsers();
+        $users = $this->fetchAllUsersFromZoho();
         $tableName = 'users';
         $this->logger->info('Fetched ' . count($users) . ' records for table ' . $tableName);
 
@@ -125,9 +126,69 @@ class ZohoDatabaseCopier
                 $types['id'] = 'string';
                 $this->connection->update($tableName, $data, $identifier, $types);
             }
-
         }
         $this->connection->commit();
+    }
+
+    private function fetchAllUsersFromZoho(): array
+    {
+        $finalUsers = [];
+        $this->logger->notice('Starting fetching users from Zoho...');
+
+        $zohoClient = new ZohoClient([
+            'client_id' => ZOHO_CRM_CLIENT_ID,
+            'client_secret' => ZOHO_CRM_CLIENT_SECRET,
+            'redirect_uri' => ZOHO_CRM_CLIENT_REDIRECT_URI,
+            'currentUserEmail' => ZOHO_CRM_CLIENT_CURRENT_USER_EMAIL,
+            'applicationLogFilePath' => ZOHO_CRM_CLIENT_APPLICATION_LOGFILEPATH,
+            'persistence_handler_class' => ZOHO_CRM_CLIENT_PERSISTENCE_HANDLER_CLASS,
+            'token_persistence_path' => ZOHO_CRM_CLIENT_PERSITENCE_PATH,
+            'sandbox' => ZOHO_CRM_SANDBOX,
+        ], 'Europe/Paris');
+
+        $client = new \GuzzleHttp\Client();
+        $page = 1;
+        $totalUsers = 0;
+        while (true) {
+            $oauthToken = $zohoClient->getZohoOAuthClient()->getAccessToken(ZOHO_CRM_CLIENT_CURRENT_USER_EMAIL);
+
+            $this->logger->info('Getting users for page ' . $page . '...');
+            $response = $client->request('GET', 'https://' . (ZOHO_CRM_SANDBOX === 'true' ? 'sandbox' : 'www') . '.zohoapis.com/crm/v2/users', [
+                'http_errors' => false,
+                'verify' => false,
+                'headers' => [
+                    'Authorization' => 'Zoho-oauthtoken ' . $oauthToken,
+                ],
+                'query' => [
+                    'type' => 'AllUsers',
+                    'page' => $page,
+                ],
+            ]);
+
+            if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
+                $resultStr = $response->getBody()->getContents();
+                $json = json_decode($resultStr, true);
+
+                $totalUsers += $json['info']['count'];
+
+                foreach ($json['users'] as $user) {
+                    $zcrmUser = OrganizationAPIHandler::getInstance()->getZCRMUser($user);
+                    $finalUsers[] = $zcrmUser;
+                }
+
+                if ($json['info']['more_records']) {
+                    $page++;
+                } else {
+                    break;
+                }
+            } else {
+                $this->logger->error('Cannot get users for page ' . $page . ': status: ' . $response->getStatusCode() . '. Error: ' . $response->getBody()->getContents());
+                break;
+            }
+        }
+        $this->logger->notice('Finished fetching ' . $totalUsers . ' users from Zoho.');
+
+        return $finalUsers;
     }
 
     /**
@@ -171,12 +232,12 @@ class ZohoDatabaseCopier
             if ($zohoSyncConfigTableExists && $modifiedSince === null) {
                 $lastDateInConfig = $this->connection->fetchColumn('SELECT config_value FROM zoho_sync_config WHERE config_key = ? AND table_name = ?', [
                     'FETCH_RECORDS_MODIFIED_SINCE__DATE',
-                    $tableName
+                    $tableName,
                 ]);
                 if ($lastDateInConfig !== false) {
                     $lastPageInConfig = $this->connection->fetchColumn('SELECT config_value FROM zoho_sync_config WHERE config_key = ? AND table_name = ?', [
                         'FETCH_RECORDS_MODIFIED_SINCE__PAGE',
-                        $tableName
+                        $tableName,
                     ]);
                     if ($lastPageInConfig === false) {
                         $lastPageInConfig = '1';
@@ -231,7 +292,7 @@ class ZohoDatabaseCopier
         if ($tableHasColumnModifiedTime) {
             $sortColumn = 'Modified_Time';
             $sortOrder = 'asc';
-        } else if ($tableHasColumnCreatedTime) {
+        } elseif ($tableHasColumnCreatedTime) {
             $sortColumn = 'Created_Time';
             $sortOrder = 'asc';
         }
@@ -254,11 +315,12 @@ class ZohoDatabaseCopier
                 $records = $dao->getRecords(null, $sortColumn, $sortOrder, $dateModifiedSince, $recordsPage, 200, $stopAndhasMoreResults);
             } catch (ZCRMException $exception) {
                 $this->logger->error('Error when getting updated records for module ' . $dao->getPluralModuleName() . ' and page ' . $recordsPage . ': ' . $exception->getMessage(), [
-                    'exception' => $exception
+                    'exception' => $exception,
                 ]);
                 if ($throwErrors) {
                     throw $exception;
                 }
+
                 return;
             }
             if ($stopAndhasMoreResults) {
@@ -407,11 +469,12 @@ class ZohoDatabaseCopier
                 $deletedRecords = $dao->getDeletedRecordIds($dateModifiedSince, $recordsDeletedPage, 200, $stopAndhasMoreResults);
             } catch (ZCRMException $exception) {
                 $this->logger->error('Error when getting deleted records for module ' . $dao->getPluralModuleName() . ' and page ' . $recordsDeletedPage . ': ' . $exception->getMessage(), [
-                    'exception' => $exception
+                    'exception' => $exception,
                 ]);
                 if ($throwErrors) {
                     throw $exception;
                 }
+
                 return;
             }
             if ($stopAndhasMoreResults) {
@@ -482,7 +545,7 @@ class ZohoDatabaseCopier
             'applicationLogFilePath' => ZOHO_CRM_CLIENT_APPLICATION_LOGFILEPATH,
             'persistence_handler_class' => ZOHO_CRM_CLIENT_PERSISTENCE_HANDLER_CLASS,
             'token_persistence_path' => ZOHO_CRM_CLIENT_PERSITENCE_PATH,
-            'sandbox' => ZOHO_CRM_SANDBOX
+            'sandbox' => ZOHO_CRM_SANDBOX,
         ], 'Europe/Paris');
 
         $client = new \GuzzleHttp\Client();
@@ -495,14 +558,14 @@ class ZohoDatabaseCopier
             $response = $client->request('POST', 'https://' . (ZOHO_CRM_SANDBOX === 'true' ? 'sandbox' : 'www') . '.zohoapis.com/crm/bulk/v2/read', [
                 'http_errors' => false,
                 'headers' => [
-                    'Authorization' => 'Zoho-oauthtoken ' . $oauthToken
+                    'Authorization' => 'Zoho-oauthtoken ' . $oauthToken,
                 ],
                 'json' => [
                     'query' => [
                         'module' => $apiModuleName,
-                        'page' => $page
-                    ]
-                ]
+                        'page' => $page,
+                    ],
+                ],
             ]);
             $jobId = null;
             if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
@@ -510,7 +573,6 @@ class ZohoDatabaseCopier
                 $json = json_decode($resultStr, true);
 
                 $jobId = $json['data'][0]['details']['id'];
-
                 // We don't care about the job status right now, it will be checked later
             } else {
                 $this->logger->error('Cannot create bulk read query for module ' . $apiModuleName . ': status: ' . $response->getStatusCode() . '. Status: ' . $response->getBody()->getContents());
@@ -529,8 +591,8 @@ class ZohoDatabaseCopier
                 $response = $client->request('GET', 'https://' . (ZOHO_CRM_SANDBOX === 'true' ? 'sandbox' : 'www') . '.zohoapis.com/crm/bulk/v2/read/' . $jobId, [
                     'http_errors' => false,
                     'headers' => [
-                        'Authorization' => 'Zoho-oauthtoken ' . $oauthToken
-                    ]
+                        'Authorization' => 'Zoho-oauthtoken ' . $oauthToken,
+                    ],
                 ]);
                 if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
                     $resultStr = $response->getBody()->getContents();
@@ -540,9 +602,9 @@ class ZohoDatabaseCopier
                         $status = $json['data'][0]['state'];
                         if ($status === 'ADDED' || $status === 'QUEUED') {
                             $this->logger->info('Job still waiting for process');
-                        } else if ($status === 'IN PROGRESS') {
+                        } elseif ($status === 'IN PROGRESS') {
                             $this->logger->info('Job in progress');
-                        } else if ($status === 'COMPLETED') {
+                        } elseif ($status === 'COMPLETED') {
                             $this->logger->info('Job completed');
                             $jobDetails = $json;
                             break;
@@ -576,15 +638,15 @@ class ZohoDatabaseCopier
             $response = $client->request('GET', 'https://' . (ZOHO_CRM_SANDBOX === 'true' ? 'sandbox' : 'www') . '.zohoapis.com/crm/bulk/v2/read/' . $jobId . '/result', [
                 'http_errors' => false,
                 'headers' => [
-                    'Authorization' => 'Zoho-oauthtoken ' . $oauthToken
+                    'Authorization' => 'Zoho-oauthtoken ' . $oauthToken,
                 ],
-                'sink' => $jobZipFile
+                'sink' => $jobZipFile,
             ]);
             if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
                 $this->logger->info('Extracting ' . $jobZipFile . ' file for module ' . $apiModuleName . ' and page ' . $page . '...');
                 $zip = new ZipArchive();
                 $res = $zip->open($jobZipFile);
-                if ($res === TRUE) {
+                if ($res === true) {
                     $zip->extractTo($jobCsvPath);
                     $zip->close();
                     $this->logger->info('File extracted in ' . $jobCsvFile);
@@ -664,7 +726,7 @@ class ZohoDatabaseCopier
                             if ($columnName === 'Owner' || $columnName === 'Created_By' || $columnName === 'Modified_By') {
                                 $recordDataToInsert[$decodedColumnName . '_OwnerID'] = $value === '' ? null : $value;
                                 $recordDataToInsert[$decodedColumnName . '_OwnerName'] = $users[$value] ?? null;
-                            } else if ($table->hasColumn($decodedColumnName . '_ID')) {
+                            } elseif ($table->hasColumn($decodedColumnName . '_ID')) {
                                 $recordDataToInsert[$decodedColumnName . '_ID'] = $value === '' ? null : $value;
                             }
                         }
@@ -694,17 +756,17 @@ class ZohoDatabaseCopier
     {
         $configExists = $this->connection->fetchColumn('SELECT config_value FROM zoho_sync_config WHERE config_key = ? AND table_name = ?', [
             $configKey,
-            $tableName
+            $tableName,
         ]);
         if ($configExists === false) {
             $this->connection->insert('zoho_sync_config', [
                 'config_key' => $configKey,
                 'table_name' => $tableName,
-                'config_value' => $configValue
+                'config_value' => $configValue,
             ]);
         } else {
             $this->connection->update('zoho_sync_config', [
-                'config_value' => $configValue
+                'config_value' => $configValue,
             ], [
                 'config_key' => $configKey,
                 'table_name' => $tableName,
